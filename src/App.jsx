@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -12,22 +12,47 @@ import ProtectedRoute from "./Pages/ProtectedRoute";
 import Login from "./Pages/Login";
 import Inventory from "./Pages/Inventory";
 import Dashboard from "./Pages/Dashboard";
+import Sales from "./Pages/Sales";
+import Report from "./Pages/Report";
+import { AuthProvider } from "./context/AuthContext";
 
-function Sales() {
-  return <h1 className="text-3xl font-bold">Sales</h1>;
-}
-function Report() {
-  return <h1 className="text-3xl font-bold">Report</h1>;
-}
 function Logout() {
   return <h1 className="text-3xl font-bold">Logout</h1>;
 }
 
 function AppLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 bg-white p-10">{children}</div>
+    <div className="flex min-h-screen relative">
+      {/* Sidebar */}
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      {/* Content */}
+      <div className="flex-1 bg-white lg:ml-[240px]">
+        {/* Topbar for mobile */}
+        <div className="lg:hidden sticky top-0 z-10 bg-white border-b border-gray-200 flex items-center px-2 h-16">
+          <button
+            type="button"
+            className="p-2"
+            onClick={() => setSidebarOpen((v) => !v)}
+          >
+            <div className="p-2">
+              <img
+                src="/noble_footwear_logo.png"
+                alt="Logo"
+                className="w-22 h-22 object-contain"
+              />
+            </div>
+          </button>
+        </div>
+        <div className="p-4 lg:p-10">{children}</div>
+      </div>
     </div>
   );
 }
@@ -84,9 +109,11 @@ function App() {
 
 function RootApp() {
   return (
-    <Router>
-      <App />
-    </Router>
+    <AuthProvider>
+      <Router>
+        <App />
+      </Router>
+    </AuthProvider>
   );
 }
 
