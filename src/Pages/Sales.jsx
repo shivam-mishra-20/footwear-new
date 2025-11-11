@@ -17,141 +17,40 @@ import {
 import ZXingBarcodeScanner from "./ZXingBarcodeScanner";
 import { jsPDF } from "jspdf";
 
-// Icon Components (updated to accept className and use consistent defaults)
+// Professional icon wrappers
+import {
+  FiSearch,
+  FiPlus,
+  FiMinus,
+  FiTrash2,
+  FiShoppingCart,
+  FiCreditCard,
+  FiFileText,
+} from "react-icons/fi";
+import { TbScan } from "react-icons/tb";
 const SearchIcon = ({ className = "w-5 h-5 text-gray-400" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-    />
-  </svg>
+  <FiSearch className={className} aria-hidden="true" />
 );
-
 const ScanIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h4.01M12 12v4.01"
-    />
-  </svg>
+  <TbScan className={className} aria-hidden="true" />
 );
-
 const PlusIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 4v16m8-8H4"
-    />
-  </svg>
+  <FiPlus className={className} aria-hidden="true" />
 );
-
 const MinusIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M20 12H4"
-    />
-  </svg>
+  <FiMinus className={className} aria-hidden="true" />
 );
-
 const TrashIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-    />
-  </svg>
+  <FiTrash2 className={className} aria-hidden="true" />
 );
-
 const ShoppingCartIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6.5-5v6a1 1 0 01-1 1H9a1 1 0 01-1-1v-6m8 0V9a1 1 0 00-1-1H9a1 1 0 00-1 1v4.01"
-    />
-  </svg>
+  <FiShoppingCart className={className} aria-hidden="true" />
 );
-
 const CreditCardIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-    />
-  </svg>
+  <FiCreditCard className={className} aria-hidden="true" />
 );
-
 const DocumentIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 12h6m-6 4h6m2 5l-8-8-8 8V7a2 2 0 012-2h12a2 2 0 012 2v11z"
-    />
-  </svg>
+  <FiFileText className={className} aria-hidden="true" />
 );
 
 function Sales() {
@@ -252,32 +151,7 @@ function Sales() {
   const confirmPaymentAndCheckout = async () => {
     if (cart.length === 0) return;
     setPaymentError("");
-    if (paymentMethod === "UPI") {
-      const upiIdRegex = /^[a-zA-Z0-9._-]{3,}@[a-zA-Z]{2,}$/;
-      const genericRef = /^[a-zA-Z0-9_-]{6,}$/;
-      if (
-        !paymentRef ||
-        !(upiIdRegex.test(paymentRef) || genericRef.test(paymentRef))
-      ) {
-        setPaymentError(
-          "Enter a valid UPI ID (e.g., name@bank) or transaction reference."
-        );
-        return;
-      }
-    }
-    if (paymentMethod === "Card") {
-      const last4 = /^\d{4}$/;
-      const approval = /^[a-zA-Z0-9]{6,}$/;
-      if (
-        !paymentRef ||
-        !(last4.test(paymentRef) || approval.test(paymentRef))
-      ) {
-        setPaymentError(
-          "Enter card last 4 digits or approval code (min 6 chars)."
-        );
-        return;
-      }
-    }
+    // UPI and Card validations intentionally removed — paymentRef is optional
     if (paymentMethod === "Cash") {
       const received = Number(cashReceived);
       if (!Number.isFinite(received) || received < total) {

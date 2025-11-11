@@ -18,117 +18,37 @@ import ZXingBarcodeScanner from "./ZXingBarcodeScanner";
 import { jsPDF } from "jspdf";
 import { serverTimestamp } from "firebase/firestore";
 
-// Icon Components
-const ScanIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h4.01M12 12v4.01"
-    />
-  </svg>
-);
+// Icon Components (professional set via react-icons)
+import {
+  FiSearch,
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiFileText,
+  FiCheck,
+} from "react-icons/fi";
+import { TbScan } from "react-icons/tb";
 
-const SearchIcon = () => (
-  <svg
-    className="w-5 h-5 text-gray-400"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-    />
-  </svg>
+const ScanIcon = ({ className = "w-4 h-4" }) => (
+  <TbScan className={className} aria-hidden="true" />
 );
-
-const PlusIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 4v16m8-8H4"
-    />
-  </svg>
+const SearchIcon = ({ className = "w-5 h-5 text-gray-400" }) => (
+  <FiSearch className={className} aria-hidden="true" />
 );
-
-const EditIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="m16.862 4.487 1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
-    />
-  </svg>
+const PlusIcon = ({ className = "w-5 h-5" }) => (
+  <FiPlus className={className} aria-hidden="true" />
 );
-
-const DeleteIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-    />
-  </svg>
+const EditIcon = ({ className = "w-4 h-4" }) => (
+  <FiEdit2 className={className} aria-hidden="true" />
 );
-
-const InvoiceIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 12h6m-6 4h6m2 5l-8-8-8 8V7a2 2 0 012-2h12a2 2 0 012 2v11z"
-    />
-  </svg>
+const DeleteIcon = ({ className = "w-4 h-4" }) => (
+  <FiTrash2 className={className} aria-hidden="true" />
 );
-
-const CheckIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 13l4 4L19 7"
-    />
-  </svg>
+const InvoiceIcon = ({ className = "w-4 h-4" }) => (
+  <FiFileText className={className} aria-hidden="true" />
+);
+const CheckIcon = ({ className = "w-4 h-4" }) => (
+  <FiCheck className={className} aria-hidden="true" />
 );
 
 function Inventory() {
@@ -320,6 +240,36 @@ function Inventory() {
       setError(err.message || "Failed to mark as sold.");
     }
     setLoading(false);
+  };
+
+  // Professional WhatsApp invoice message builder
+  const buildWhatsAppMessage = (product) => {
+    const lines = [
+      `🧾 *Invoice Summary*`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `*Store:* Noble Footwear`,
+      `*Date:* ${new Date().toLocaleString()}`,
+      ``,
+      `👟 *Product:* ${product?.name || "-"} (${product?.barcode || "N/A"})`,
+      `📂 *Category:* ${product?.category || "-"} | ${
+        product?.gender || ""
+      } | Size: ${product?.size || "-"}`,
+      `💰 *Price:* ₹${Number(product?.price || 0).toLocaleString("en-IN")}`,
+      ``,
+      `✅ Thank you for shopping with us!`,
+      `Need assistance? Reply here – we're happy to help.`,
+      `📍 Visit again: Noble Footwear`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━`,
+    ];
+    return lines.join("\n");
+  };
+
+  // ✅ Final, correct WhatsApp encoder (preserves emojis & line breaks)
+  const encodeWhatsAppMessage = (text) => {
+    return encodeURIComponent(text)
+      .replace(/%EF%B8%8F/g, "") // strip emoji variation selectors
+      .replace(/%0A/g, "%0D%0A"); // ensure WhatsApp line breaks
   };
 
   return (
@@ -897,33 +847,134 @@ function Inventory() {
                         setInvoiceError("");
                         setInvoiceSuccess("");
                         try {
-                          const doc = new jsPDF({ unit: "pt", format: "a4" });
-                          const lines = (invoiceContent || "").split("\n");
-                          const left = 40;
-                          let top = 40;
-                          const lineHeight = 14;
-                          doc.setFontSize(12);
-                          lines.forEach((ln) => {
-                            doc.text(ln, left, top);
-                            top += lineHeight;
-                            if (top > 820) {
-                              doc.addPage();
-                              top = 40;
-                            }
-                          });
-                          const fileName = `${
-                            (invoiceProduct &&
-                              (invoiceProduct.name || invoiceProduct.id)) ||
-                            "invoice"
-                          }_${new Date()
-                            .toISOString()
-                            .slice(0, 19)
-                            .replace(/[:T]/g, "")}.pdf`;
-                          const pdfData = doc.output("bloburl");
-                          window.open(pdfData, "_blank");
-                          doc.save(fileName);
+                          if (invoiceProduct) {
+                            // Generate branded single-item invoice
+                            const doc = new jsPDF({ unit: "pt", format: "a4" });
+                            const pageWidth = doc.internal.pageSize.getWidth();
+                            const fmt = (n) =>
+                              new Intl.NumberFormat("en-IN").format(
+                                Number(n || 0)
+                              );
+                            // Header
+                            doc.setFillColor(243, 248, 255);
+                            doc.rect(0, 0, pageWidth, 90, "F");
+                            doc.setTextColor(17, 24, 39);
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(22);
+                            doc.text("NOBLE FOOTWEAR", 40, 42);
+                            doc.setFont("helvetica", "normal");
+                            doc.setFontSize(10);
+                            doc.text(
+                              "contact@noblefootwear.com | +91-XXXXXXXXXX",
+                              40,
+                              60
+                            );
+                            const invId = `INV-${
+                              invoiceProduct.barcode || invoiceProduct.id || "-"
+                            }-${new Date().toISOString().slice(0, 10)}`;
+                            doc.setFontSize(14);
+                            doc.text("TAX INVOICE", 40, 110);
+                            doc.setFontSize(11);
+                            doc.text(`Invoice No: ${invId}`, 40, 130);
+                            doc.text(
+                              `Date: ${new Date().toLocaleString()}`,
+                              40,
+                              146
+                            );
+                            // Table
+                            let y = 170;
+                            const colItem = 50,
+                              colQty = pageWidth - 260,
+                              colPrice = pageWidth - 200,
+                              colAmt = pageWidth - 40;
+                            doc.setFillColor(240, 245, 255);
+                            doc.rect(40, y, pageWidth - 80, 26, "F");
+                            doc.setFontSize(11);
+                            doc.text("Item", colItem, y + 17);
+                            doc.text("Qty", colQty - 10, y + 17, {
+                              align: "right",
+                            });
+                            doc.text("Price", colPrice, y + 17, {
+                              align: "right",
+                            });
+                            doc.text("Amount", colAmt, y + 17, {
+                              align: "right",
+                            });
+                            y += 34;
+                            const qty = 1;
+                            const price = Number(invoiceProduct.price || 0);
+                            const amt = qty * price;
+                            doc.setFontSize(10);
+                            doc.text(
+                              `${invoiceProduct.name || "Product"} (${
+                                invoiceProduct.barcode || "-"
+                              })`,
+                              colItem,
+                              y
+                            );
+                            doc.text(String(qty), colQty - 10, y, {
+                              align: "right",
+                            });
+                            doc.text(`₹${fmt(price)}`, colPrice, y, {
+                              align: "right",
+                            });
+                            doc.text(`₹${fmt(amt)}`, colAmt, y, {
+                              align: "right",
+                            });
+                            y += 20;
+                            doc.setDrawColor(220);
+                            doc.line(40, y, pageWidth - 40, y);
+                            y += 18;
+                            const labelRight = colAmt - 120,
+                              totalRight = colAmt;
+                            doc.setFontSize(11);
+                            doc.text("Subtotal", labelRight, y, {
+                              align: "right",
+                            });
+                            doc.text(`₹${fmt(amt)}`, totalRight, y, {
+                              align: "right",
+                            });
+                            y += 16;
+                            doc.setFontSize(12);
+                            doc.text("Total", labelRight, y, {
+                              align: "right",
+                            });
+                            doc.text(`₹${fmt(amt)}`, totalRight, y, {
+                              align: "right",
+                            });
+                            y += 30;
+                            doc.setFontSize(9);
+                            doc.text(
+                              "Thank you for your purchase! Exchange within 7 days with original bill.",
+                              40,
+                              y
+                            );
+                            const fileName = `${(
+                              invoiceProduct.name || "invoice"
+                            )
+                              .toString()
+                              .replace(/\s+/g, "_")}_${Date.now()}.pdf`;
+                            doc.save(fileName);
+                          } else {
+                            // Fallback to free-text PDF
+                            const doc = new jsPDF({ unit: "pt", format: "a4" });
+                            const lines = (invoiceContent || "").split("\n");
+                            let top = 40;
+                            const left = 40;
+                            const lh = 14;
+                            doc.setFontSize(12);
+                            lines.forEach((ln) => {
+                              doc.text(ln, left, top);
+                              top += lh;
+                              if (top > 820) {
+                                doc.addPage();
+                                top = 40;
+                              }
+                            });
+                            doc.save(`invoice_${Date.now()}.pdf`);
+                          }
                           setInvoiceSuccess(
-                            "PDF generated and opened. Attach it in WhatsApp to send as file."
+                            "PDF generated. You can also attach it on WhatsApp."
                           );
                         } catch (err) {
                           setInvoiceError("Failed to generate PDF.");
@@ -956,8 +1007,10 @@ function Inventory() {
                           return;
                         }
                         try {
-                          const msg = invoiceContent || "";
-                          const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(
+                          const msg = invoiceProduct
+                            ? buildWhatsAppMessage(invoiceProduct)
+                            : invoiceContent || "";
+                          const waUrl = `https://api.whatsapp.com/send?phone=${digits}&text=${encodeWhatsAppMessage(
                             msg
                           )}`;
                           window.open(waUrl, "_blank");

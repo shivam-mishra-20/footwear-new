@@ -2,13 +2,9 @@ import React from "react";
 import { NavLink, useNavigate } from "react-router";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
-import {
-  FiHome,
-  FiBox,
-  FiShoppingCart,
-  FiBarChart2,
-  FiLogOut,
-} from "react-icons/fi";
+// Updated to more business-appropriate icon set (Lucide/Feather style via react-icons)
+import { FiHome, FiBarChart2, FiLogOut } from "react-icons/fi";
+import { LuPackage, LuShoppingCart } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext";
 
 function Sidebar({ open, setOpen }) {
@@ -48,8 +44,8 @@ function Sidebar({ open, setOpen }) {
       <nav className="px-3 flex flex-col gap-1">
         {[
           { to: "/", label: "Dashboard", icon: FiHome, end: true },
-          { to: "/inventory", label: "Inventory", icon: FiBox },
-          { to: "/sales", label: "Sales", icon: FiShoppingCart },
+          { to: "/inventory", label: "Inventory", icon: LuPackage },
+          { to: "/sales", label: "Point of Sale", icon: LuShoppingCart },
           { to: "/report", label: "Reports", icon: FiBarChart2 },
         ].map((item) => (
           <NavLink

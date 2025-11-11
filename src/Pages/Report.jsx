@@ -3,133 +3,39 @@ import { db } from "../../firebaseConfig";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { jsPDF } from "jspdf";
 
-// Icon Components
-const ReportIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-    />
-  </svg>
+// Professional icons via react-icons (Feather/Lucide)
+import {
+  FiBarChart2,
+  FiShoppingBag,
+  FiPackage,
+  FiDownload,
+  FiFileText,
+  FiCalendar,
+  FiTrendingUp,
+} from "react-icons/fi";
+const ReportIcon = ({ className = "w-6 h-6" }) => (
+  <FiBarChart2 className={className} aria-hidden="true" />
 );
-
-const OrderIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 12H6L5 9z"
-    />
-  </svg>
+const OrderIcon = ({ className = "w-6 h-6" }) => (
+  <FiShoppingBag className={className} aria-hidden="true" />
 );
-
-const PackageIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M20 7l-8-4-8 4m16 0l-8 4-8-4m16 0v10l-8 4-8-4V7"
-    />
-  </svg>
+const PackageIcon = ({ className = "w-6 h-6" }) => (
+  <FiPackage className={className} aria-hidden="true" />
 );
-
-const CurrencyIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-    />
-  </svg>
+const CurrencyIcon = ({ className = "w-6 h-6" }) => (
+  <FiBarChart2 className={className} aria-hidden="true" />
 );
-
-const DownloadIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-    />
-  </svg>
+const DownloadIcon = ({ className = "w-4 h-4" }) => (
+  <FiDownload className={className} aria-hidden="true" />
 );
-
-const DocumentIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 12h6m-6 4h6m2 5l-8-8-8 8V7a2 2 0 012-2h12a2 2 0 012 2v11z"
-    />
-  </svg>
+const DocumentIcon = ({ className = "w-4 h-4" }) => (
+  <FiFileText className={className} aria-hidden="true" />
 );
-
-const CalendarIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-    />
-  </svg>
+const CalendarIcon = ({ className = "w-4 h-4" }) => (
+  <FiCalendar className={className} aria-hidden="true" />
 );
-
-const TrendUpIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-    />
-  </svg>
+const TrendUpIcon = ({ className = "w-4 h-4" }) => (
+  <FiTrendingUp className={className} aria-hidden="true" />
 );
 
 function sum(items, f) {
