@@ -380,58 +380,56 @@ function Sales() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 sm:p-6 lg:p-2">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 lg:p-6">
       <div className="max-w-[1400px] mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-xl">
-              <ShoppingCartIcon />
+        <div className="mb-4 sm:mb-6 lg:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg sm:rounded-xl">
+              <ShoppingCartIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            Point of Sale
+            <span className="truncate">Point of Sale</span>
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Process sales, manage cart, and complete transactions
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* Product Selection Panel */}
-          <div className="xl:col-span-8">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+          <div className="lg:col-span-8 order-2 lg:order-1">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100">
               {/* Search Header */}
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex flex-col sm:flex-row gap-4">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-100">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                   <div className="relative flex-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <SearchIcon />
+                      <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
                     </div>
                     <input
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                      placeholder="Search products by name, code, or category"
+                      className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      placeholder="Search products..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
                   <button
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center gap-2"
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg sm:rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base"
                     onClick={() => setShowScanner(true)}
                   >
-                    <ScanIcon className="w-5 h-5 text-white" />
-                    <span className="ml-2 text-sm sm:text-base font-medium">
-                      Scan Barcode
-                    </span>
+                    <ScanIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    <span className="font-medium">Scan</span>
                   </button>
                 </div>
               </div>
 
-              {/* Products Table */}
+              {/* Products Table/List */}
               <div className="overflow-hidden">
-                <div className="max-h-96 overflow-y-auto">
+                <div className="max-h-[50vh] sm:max-h-96 overflow-y-auto">
                   {filtered.length > 0 ? (
                     <>
-                      {/* Desktop / Tablet: table (visible md and up) */}
-                      <div className="hidden md:block">
+                      {/* Desktop / Tablet: table (visible lg and up) */}
+                      <div className="hidden lg:block">
                         <table className="w-full">
                           <thead className="bg-gray-50 sticky top-0">
                             <tr>
@@ -515,64 +513,68 @@ function Sales() {
                         </table>
                       </div>
 
-                      {/* Mobile: card list (visible below md) */}
-                      <div className="md:hidden space-y-3 p-3">
+                      {/* Mobile & Tablet: card list (visible below lg) */}
+                      <div className="lg:hidden space-y-2 p-2 sm:p-3">
                         {filtered.map((product) => (
                           <div
                             key={product.id}
-                            className="bg-white border border-gray-100 rounded-xl p-3 flex items-center justify-between"
+                            className="bg-white border border-gray-100 rounded-lg sm:rounded-xl p-3 sm:p-4"
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-gray-900 truncate">
-                                {product.name}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm sm:text-base font-medium text-gray-900 truncate">
+                                  {product.name}
+                                </div>
+                                <div className="text-xs sm:text-sm text-gray-500 mt-1 space-y-0.5">
+                                  <div className="truncate">
+                                    {product.category} • Size: {product.size}
+                                  </div>
+                                  <div className="truncate">
+                                    Code: {product.barcode}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {product.category} • Size: {product.size}
+                              <div className="flex flex-col items-end gap-2">
+                                <span
+                                  className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                                    Number(product.stock) <= 0
+                                      ? "bg-red-100 text-red-800"
+                                      : Number(product.stock) <= 5
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-green-100 text-green-800"
+                                  }`}
+                                >
+                                  {product.stock}
+                                </span>
+                                <div className="text-sm sm:text-base font-semibold text-gray-900">
+                                  ₹{product.price}
+                                </div>
+                                <button
+                                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                                    Number(product.stock) <= 0
+                                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                      : "bg-green-100 text-green-700 hover:bg-green-200 active:scale-95"
+                                  }`}
+                                  disabled={Number(product.stock) <= 0}
+                                  onClick={() => addToCart(product, 1)}
+                                >
+                                  <PlusIcon className="w-4 h-4" />
+                                </button>
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                Code: {product.barcode}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end ml-3">
-                              <div
-                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                                  Number(product.stock) <= 0
-                                    ? "bg-red-100 text-red-800"
-                                    : Number(product.stock) <= 5
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-green-100 text-green-800"
-                                }`}
-                              >
-                                {product.stock}
-                              </div>
-                              <div className="text-sm font-semibold text-gray-900 mt-2">
-                                ₹{product.price}
-                              </div>
-                              <button
-                                className={`mt-2 w-10 h-10 rounded-lg flex items-center justify-center ${
-                                  Number(product.stock) <= 0
-                                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                    : "bg-green-100 text-green-700 hover:bg-green-200"
-                                }`}
-                                disabled={Number(product.stock) <= 0}
-                                onClick={() => addToCart(product, 1)}
-                              >
-                                <PlusIcon className="w-4 h-4" />
-                              </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-12">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <SearchIcon />
+                    <div className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                        <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8" />
                       </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
                         No products found
                       </h3>
-                      <p className="text-gray-500 text-center">
+                      <p className="text-sm sm:text-base text-gray-500 text-center">
                         {search
                           ? "Try adjusting your search terms"
                           : "No products available"}
@@ -585,32 +587,32 @@ function Sales() {
           </div>
 
           {/* Cart Panel */}
-          <div className="xl:col-span-4">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 h-fit">
+          <div className="lg:col-span-4 order-1 lg:order-2">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 lg:sticky lg:top-4">
               {/* Cart Header */}
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <div className="p-1.5 bg-green-100 rounded-lg">
-                    <ShoppingCartIcon />
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <div className="p-1 sm:p-1.5 bg-green-100 rounded-lg">
+                    <ShoppingCartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  Shopping Cart
+                  <span className="truncate">Shopping Cart</span>
                   {cart.length > 0 && (
-                    <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                      {cart.length} item{cart.length !== 1 ? "s" : ""}
+                    <span className="ml-auto px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full whitespace-nowrap">
+                      {cart.length}
                     </span>
                   )}
                 </h3>
               </div>
 
               {/* Cart Items */}
-              <div className="p-6">
-                <div className="space-y-3 max-h-72 overflow-y-auto">
+              <div className="p-3 sm:p-4 lg:p-6">
+                <div className="space-y-2 sm:space-y-3 max-h-[40vh] sm:max-h-64 lg:max-h-72 overflow-y-auto">
                   {cart.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <ShoppingCartIcon />
+                    <div className="text-center py-6 sm:py-8">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                        <ShoppingCartIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-gray-500 text-xs sm:text-sm">
                         Your cart is empty
                       </p>
                       <p className="text-gray-400 text-xs mt-1">
@@ -621,53 +623,53 @@ function Sales() {
                     cart.map((item) => (
                       <div
                         key={item.id}
-                        className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-0 md:p-2 p-3 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors duration-150"
+                        className="p-2.5 sm:p-3 border border-gray-100 rounded-lg sm:rounded-xl hover:border-gray-200 transition-colors duration-150"
                       >
-                        <div className="flex-1 min-w-10">
-                          <div className="font-medium text-gray-900 truncate">
-                            {item.name}
-                          </div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            <span className="truncate block">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm sm:text-base font-medium text-gray-900 truncate">
+                              {item.name}
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">
                               Code: {item.barcode}
-                            </span>
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-start justify-start gap-1 mt-2 md:mt-0">
-                          <button
-                            className="p-2 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-150 flex items-center justify-center"
-                            onClick={() => updateQty(item.id, item.qty - 1)}
-                            aria-label="Decrease quantity"
-                          >
-                            <MinusIcon className="w-4 h-4" />
-                          </button>
-                          <input
-                            className="w-14 sm:w-12 text-center text-sm border border-gray-200 rounded-lg py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            value={item.qty}
-                            onChange={(e) =>
-                              updateQty(item.id, Number(e.target.value) || 0)
-                            }
-                          />
-                          <button
-                            className="p-1.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-150 flex items-center justify-center"
-                            onClick={() => updateQty(item.id, item.qty + 1)}
-                            aria-label="Increase quantity"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="mt-3 sm:mt-0 flex items-center gap-3 ml-auto">
-                          <div className="text-sm font-semibold text-gray-900 w-20 text-right">
+                          <div className="text-sm sm:text-base font-semibold text-gray-900 whitespace-nowrap">
                             ₹{item.price * item.qty}
                           </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <button
+                              className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-100 hover:bg-gray-200 active:scale-95 rounded-lg transition-all duration-150 flex items-center justify-center"
+                              onClick={() => updateQty(item.id, item.qty - 1)}
+                              aria-label="Decrease quantity"
+                            >
+                              <MinusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </button>
+                            <input
+                              className="w-12 sm:w-14 text-center text-sm border border-gray-200 rounded-lg py-1.5 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                              value={item.qty}
+                              onChange={(e) =>
+                                updateQty(item.id, Number(e.target.value) || 0)
+                              }
+                              inputMode="numeric"
+                            />
+                            <button
+                              className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-100 hover:bg-gray-200 active:scale-95 rounded-lg transition-all duration-150 flex items-center justify-center"
+                              onClick={() => updateQty(item.id, item.qty + 1)}
+                              aria-label="Increase quantity"
+                            >
+                              <PlusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
                           <button
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors duration-150"
+                            className="w-8 h-8 sm:w-9 sm:h-9 text-red-500 hover:bg-red-50 active:scale-95 rounded-lg transition-all duration-150 flex items-center justify-center"
                             onClick={() => removeFromCart(item.id)}
                             aria-label="Remove item"
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <TrashIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       </div>
@@ -677,12 +679,12 @@ function Sales() {
 
                 {/* Total */}
                 {cart.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-lg font-semibold text-gray-900">
+                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-100">
+                    <div className="flex justify-between items-center mb-3 sm:mb-4">
+                      <span className="text-base sm:text-lg font-semibold text-gray-900">
                         Total
                       </span>
-                      <span className="text-xl font-bold text-green-600">
+                      <span className="text-lg sm:text-xl font-bold text-green-600">
                         ₹{total.toLocaleString()}
                       </span>
                     </div>
@@ -690,13 +692,13 @@ function Sales() {
                 )}
 
                 {/* Customer Information */}
-                <div className="space-y-4 mt-6">
-                  <h4 className="font-medium text-gray-900">
+                <div className="space-y-3 sm:space-y-4 mt-4 sm:mt-6">
+                  <h4 className="text-sm sm:text-base font-medium text-gray-900">
                     Customer Information
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     <input
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                       placeholder="Customer name (optional)"
                       value={customer.name}
                       onChange={(e) =>
@@ -704,15 +706,16 @@ function Sales() {
                       }
                     />
                     <input
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                       placeholder="Phone number (optional)"
                       value={customer.phone}
                       onChange={(e) =>
                         setCustomer({ ...customer, phone: e.target.value })
                       }
+                      inputMode="tel"
                     />
                     <textarea
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
                       placeholder="Additional notes (optional)"
                       rows={2}
                       value={note}
@@ -724,32 +727,33 @@ function Sales() {
                 {/* Messages */}
                 {msg.text && (
                   <div
-                    className={`mt-4 p-4 rounded-xl ${
+                    className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-lg sm:rounded-xl ${
                       msg.type === "error"
                         ? "bg-red-50 border border-red-200 text-red-700"
                         : "bg-green-50 border border-green-200 text-green-700"
                     }`}
                   >
-                    <p className="text-sm font-medium">{msg.text}</p>
+                    <p className="text-xs sm:text-sm font-medium">{msg.text}</p>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
                   <button
-                    className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold py-3 rounded-xl hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                    className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold py-2.5 sm:py-3 rounded-lg sm:rounded-xl hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 text-sm sm:text-base"
                     disabled={busy || cart.length === 0}
                     onClick={checkout}
                   >
-                    <CreditCardIcon />
+                    <CreditCardIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                     {busy ? "Processing..." : "Checkout"}
                   </button>
                   <button
-                    className="px-4 py-3 bg-blue-100 text-white font-medium rounded-xl hover:bg-blue-200 focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 text-white font-medium rounded-lg sm:rounded-xl hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center justify-center flex-shrink-0"
                     disabled={cart.length === 0}
                     onClick={generateInvoicePdf}
+                    title="Generate Invoice"
                   >
-                    <DocumentIcon />
+                    <DocumentIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
               </div>
@@ -759,16 +763,16 @@ function Sales() {
 
         {/* Barcode Scanner Modal */}
         {showScanner && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg md:max-w-md">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-lg">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Scan Barcode
                   </h3>
                   <button
                     onClick={() => setShowScanner(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-150"
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-150 active:scale-95"
                   >
                     <svg
                       className="w-5 h-5"
@@ -785,11 +789,11 @@ function Sales() {
                     </svg>
                   </button>
                 </div>
-                <div className="rounded-xl overflow-hidden bg-black h-56 md:h-96">
+                <div className="rounded-lg sm:rounded-xl overflow-hidden bg-black h-64 sm:h-80">
                   <ZXingBarcodeScanner
                     onResult={handleScan}
                     onClose={() => setShowScanner(false)}
-                    height={360}
+                    height={320}
                   />
                 </div>
               </div>
@@ -799,24 +803,24 @@ function Sales() {
 
         {/* Payment Method Modal */}
         {showPayment && (
-          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900">
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
                     Payment Method
                   </h3>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-xs sm:text-sm text-gray-500 font-medium">
                     Total: ₹{total.toLocaleString()}
                   </div>
                 </div>
 
                 {/* Payment Methods */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
                   {["Cash", "UPI", "Card", "Other"].map((method) => (
                     <button
                       key={method}
-                      className={`p-4 rounded-xl border-2 font-medium transition-all duration-150 ${
+                      className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border-2 font-medium transition-all duration-150 text-sm sm:text-base active:scale-95 ${
                         paymentMethod === method
                           ? "border-green-500 bg-green-50 text-green-700"
                           : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
@@ -830,20 +834,20 @@ function Sales() {
 
                 {/* Payment Details */}
                 {paymentMethod === "Cash" && (
-                  <div className="mb-6">
+                  <div className="mb-4 sm:mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Cash Received
                     </label>
                     <input
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                       placeholder="Enter amount received"
                       value={cashReceived}
                       onChange={(e) => setCashReceived(e.target.value)}
                       inputMode="decimal"
                     />
                     {Number(cashReceived) >= total && (
-                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm text-green-700 font-medium">
+                      <div className="mt-2 p-2.5 sm:p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-xs sm:text-sm text-green-700 font-medium">
                           Change: ₹
                           {Math.max(
                             0,
@@ -856,18 +860,18 @@ function Sales() {
                 )}
 
                 {paymentMethod !== "Cash" && (
-                  <div className="mb-6">
+                  <div className="mb-4 sm:mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Payment Reference
                     </label>
                     <input
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                       placeholder={
                         paymentMethod === "UPI"
-                          ? "Enter UPI transaction ID or UPI ID"
+                          ? "Enter UPI transaction ID"
                           : paymentMethod === "Card"
-                          ? "Enter last 4 digits or approval code"
-                          : "Payment reference number"
+                          ? "Enter last 4 digits"
+                          : "Payment reference"
                       }
                       value={paymentRef}
                       onChange={(e) => setPaymentRef(e.target.value)}
@@ -877,17 +881,17 @@ function Sales() {
 
                 {/* Payment Error */}
                 {paymentError && (
-                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-red-700 text-sm font-medium">
+                  <div className="mb-3 sm:mb-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg sm:rounded-xl">
+                    <p className="text-red-700 text-xs sm:text-sm font-medium">
                       {paymentError}
                     </p>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 justify-end">
+                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
                   <button
-                    className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors duration-200"
+                    className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-100 text-gray-700 font-medium rounded-lg sm:rounded-xl hover:bg-gray-200 transition-colors duration-200 text-sm sm:text-base active:scale-95"
                     onClick={() => {
                       if (!busy) setShowPayment(false);
                     }}
@@ -896,7 +900,7 @@ function Sales() {
                     Cancel
                   </button>
                   <button
-                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center gap-2"
+                    className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg sm:rounded-xl hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center gap-2 text-sm sm:text-base"
                     disabled={busy}
                     onClick={confirmPaymentAndCheckout}
                   >
@@ -907,8 +911,10 @@ function Sales() {
                       </>
                     ) : (
                       <>
-                        <CreditCardIcon />
-                        Confirm Payment ₹{total.toLocaleString()}
+                        <CreditCardIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="truncate">
+                          Confirm ₹{total.toLocaleString()}
+                        </span>
                       </>
                     )}
                   </button>

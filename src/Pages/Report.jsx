@@ -255,26 +255,26 @@ function Report() {
 
   const MetricCard = ({ title, value, Icon, bgColor, textColor, trend }) => (
     <div
-      className={`${bgColor} rounded-2xl p-6 shadow-lg border border-gray-100 transition-all duration-200 hover:shadow-xl hover:scale-[1.02]`}
+      className={`${bgColor} rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 transition-all duration-200 hover:shadow-xl hover:scale-[1.02]`}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3 sm:mb-4">
         <div
-          className={`p-3 rounded-xl ${textColor
+          className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${textColor
             .replace("text-", "bg-")
             .replace("-600", "-100")} ${textColor}`}
         >
-          {Icon && <Icon />}
+          {Icon && <Icon className="w-5 h-5 sm:w-6 sm:h-6" />}
         </div>
         {trend && (
           <div className="flex items-center gap-1 text-xs text-green-600">
-            <TrendUpIcon />
+            <TrendUpIcon className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="font-medium">+12%</span>
           </div>
         )}
       </div>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-3xl font-bold text-gray-900">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">{title}</p>
+        <p className="text-2xl sm:text-3xl font-bold text-gray-900">
           {title.includes("Revenue")
             ? `₹${value.toLocaleString()}`
             : value.toLocaleString()}
@@ -295,16 +295,19 @@ function Report() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="min-h-screen bg-gray-50 p-3 sm:p-4 lg:p-6">
         <div className="max-w-[1400px] mx-auto">
-          <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-gray-200 rounded w-48"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="animate-pulse space-y-6 sm:space-y-8">
+            <div className="h-6 sm:h-8 bg-gray-200 rounded w-32 sm:w-48"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-2xl"></div>
+                <div
+                  key={i}
+                  className="h-28 sm:h-32 bg-gray-200 rounded-xl sm:rounded-2xl"
+                ></div>
               ))}
             </div>
-            <div className="h-96 bg-gray-200 rounded-2xl"></div>
+            <div className="h-64 sm:h-96 bg-gray-200 rounded-xl sm:rounded-2xl"></div>
           </div>
         </div>
       </div>
@@ -312,29 +315,29 @@ function Report() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 sm:p-6 lg:p-2">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 lg:p-6">
       <div className="max-w-[1400px] mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-xl">
-                <ReportIcon />
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg sm:rounded-xl flex-shrink-0">
+                <ReportIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">
                   Sales Reports
                 </h1>
-                <p className="text-gray-600 mt-1">
-                  Comprehensive analytics and insights • {getRangeText()}
+                <p className="text-sm sm:text-base text-gray-600 mt-1">
+                  Analytics & insights • {getRangeText()}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
-                <CalendarIcon />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 bg-white rounded-lg sm:rounded-xl p-2 shadow-sm border border-gray-100 flex-1 sm:flex-initial">
+                <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 ml-1" />
                 <select
-                  className="bg-transparent border-none focus:ring-0 text-sm font-medium text-gray-700 p-3 "
+                  className="bg-transparent border-none focus:ring-0 text-sm font-medium text-gray-700 py-1 sm:py-2 px-1 flex-1"
                   value={range}
                   onChange={(e) => setRange(e.target.value)}
                 >
@@ -344,18 +347,18 @@ function Report() {
                 </select>
               </div>
               <button
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-medium rounded-lg sm:rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl text-sm sm:text-base"
                 onClick={exportCSV}
               >
-                <DownloadIcon />
-                <span className="hidden sm:inline">Export CSV</span>
+                <DownloadIcon className="w-4 h-4" />
+                <span>Export CSV</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <MetricCard
             title="Total Orders"
             value={totals.orders}
@@ -383,15 +386,15 @@ function Report() {
         </div>
 
         {/* Sales Table */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100">
           {/* Table Header */}
-          <div className="p-6 border-b border-gray-100">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-6 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">
                   Sales Transactions
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs sm:text-sm text-gray-600">
                   {filtered.length} transaction
                   {filtered.length !== 1 ? "s" : ""} in selected period
                 </p>
@@ -401,130 +404,206 @@ function Report() {
 
           {/* Table Content */}
           <div className="overflow-hidden">
-            <div className="overflow-x-auto">
-              {filtered.length > 0 ? (
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Sale ID
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Date & Time
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Customer
-                      </th>
-                      <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Items
-                      </th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Total
-                      </th>
-                      <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Payment
-                      </th>
-                      <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filtered.map((sale) => (
-                      <tr
-                        key={sale.id}
-                        className="hover:bg-gray-50 transition-colors duration-150"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
+            {filtered.length > 0 ? (
+              <>
+                {/* Desktop Table (hidden on mobile) */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Sale ID
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Date & Time
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Customer
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Items
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Total
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Payment
+                        </th>
+                        <th className="px-4 lg:px-6 py-3 lg:py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filtered.map((sale) => (
+                        <tr
+                          key={sale.id}
+                          className="hover:bg-gray-50 transition-colors duration-150"
+                        >
+                          <td className="px-4 lg:px-6 py-3 lg:py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {sale.sale_id}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4">
+                            <div className="text-sm text-gray-900">
+                              {sale.created_at?.toDate
+                                ? sale.created_at.toDate().toLocaleDateString()
+                                : "—"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {sale.created_at?.toDate
+                                ? sale.created_at.toDate().toLocaleTimeString()
+                                : ""}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {sale.customer?.name || "Walk-in Customer"}
+                            </div>
+                            {sale.customer?.phone && (
+                              <div className="text-xs text-gray-500">
+                                {sale.customer.phone}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {(sale.items || []).length} item
+                              {(sale.items || []).length !== 1 ? "s" : ""}
+                            </span>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-right">
+                            <div className="text-sm font-semibold text-gray-900">
+                              ₹{Number(sale.total || 0).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-center">
+                            <div className="text-sm text-gray-900">
+                              {sale.payment?.method || "—"}
+                            </div>
+                            {sale.payment?.reference && (
+                              <div className="text-xs text-gray-500 truncate max-w-20">
+                                {sale.payment.reference}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 lg:px-6 py-3 lg:py-4 text-center">
+                            <button
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 active:scale-95 transition-all duration-150"
+                              onClick={() => downloadInvoice(sale)}
+                            >
+                              <DocumentIcon />
+                              Invoice
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card List (visible on mobile only) */}
+                <div className="md:hidden space-y-3 p-3">
+                  {filtered.map((sale) => (
+                    <div
+                      key={sale.id}
+                      className="bg-white border border-gray-100 rounded-lg p-4 space-y-3"
+                    >
+                      {/* Header Row */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
                             {sale.sale_id}
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">
+                          <div className="text-xs text-gray-500 mt-0.5">
                             {sale.created_at?.toDate
                               ? sale.created_at.toDate().toLocaleDateString()
                               : "—"}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {sale.created_at?.toDate
-                              ? sale.created_at.toDate().toLocaleTimeString()
-                              : ""}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-base font-bold text-gray-900">
+                            ₹{Number(sale.total || 0).toLocaleString()}
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {sale.customer?.name || "Walk-in Customer"}
-                          </div>
-                          {sale.customer?.phone && (
-                            <div className="text-xs text-gray-500">
-                              {sale.customer.phone}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-1">
                             {(sale.items || []).length} item
                             {(sale.items || []).length !== 1 ? "s" : ""}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="text-sm font-semibold text-gray-900">
-                            ₹{Number(sale.total || 0).toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Customer Info */}
+                      <div className="border-t border-gray-100 pt-2">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Customer
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {sale.customer?.name || "Walk-in Customer"}
+                        </div>
+                        {sale.customer?.phone && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {sale.customer.phone}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="text-sm text-gray-900">
-                            {sale.payment?.method || "—"}
-                          </div>
-                          {sale.payment?.reference && (
-                            <div className="text-xs text-gray-500 truncate max-w-20">
-                              {sale.payment.reference}
+                        )}
+                      </div>
+
+                      {/* Payment Info */}
+                      <div className="border-t border-gray-100 pt-2">
+                        <div className="text-xs text-gray-500 mb-1">
+                          Payment
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {sale.payment?.method || "—"}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
+                            {sale.payment?.reference && (
+                              <div className="text-xs text-gray-500 mt-0.5 truncate max-w-[180px]">
+                                Ref: {sale.payment.reference}
+                              </div>
+                            )}
+                          </div>
                           <button
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-150"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 active:scale-95 transition-all duration-150"
                             onClick={() => downloadInvoice(sale)}
                           >
-                            <DocumentIcon />
+                            <DocumentIcon className="w-3.5 h-3.5" />
                             Invoice
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <ReportIcon />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No sales data found
-                  </h3>
-                  <p className="text-gray-500 text-center max-w-md">
-                    No sales transactions were found for the selected time
-                    period. Try adjusting your date range or check back later.
-                  </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                  <ReportIcon className="w-6 h-6 sm:w-8 sm:h-8" />
+                </div>
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
+                  No sales data found
+                </h3>
+                <p className="text-sm sm:text-base text-gray-500 text-center max-w-md px-4">
+                  No sales transactions were found for the selected time period.
+                  Try adjusting your date range or check back later.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Table Footer */}
           {filtered.length > 0 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-              <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-gray-600">
                 <span>
                   Showing {filtered.length} transaction
                   {filtered.length !== 1 ? "s" : ""}
-                  from {getRangeText().toLowerCase()}
                 </span>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
                   <span className="font-medium">
-                    Total Revenue: ₹{totals.revenue.toLocaleString()}
+                    Total: ₹{totals.revenue.toLocaleString()}
                   </span>
                 </div>
               </div>
