@@ -257,7 +257,7 @@ function Report() {
 
     // Header
     doc.setFontSize(20);
-    doc.text("NOBLE FOOTWEAR", 40, y);
+    doc.text("SHREE NOBLE FOOTWEAR", 40, y);
     y += 18;
     doc.setFontSize(10);
     doc.text("GSTIN: —", 40, y);
@@ -443,7 +443,7 @@ function Report() {
     const lines = [
       `🧾 *Invoice Summary*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `*Store:* Noble Footwear`,
+      `*Store:* Shree Noble Footwear`,
       `*Date:* ${
         sale.created_at?.toDate
           ? sale.created_at.toDate().toLocaleString()
@@ -528,7 +528,7 @@ function Report() {
       ``,
       `✅ Thank you for shopping with us!`,
       `Need assistance? Reply here – we're happy to help.`,
-      `📍 Visit again: Noble Footwear`
+      `📍 Visit again: Shree Noble Footwear`
     );
     return lines.filter(Boolean).join("\n");
   };

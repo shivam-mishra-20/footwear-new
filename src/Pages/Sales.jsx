@@ -330,7 +330,7 @@ function Sales() {
     const lines = [
       `🧾 *Invoice Summary*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `*Store:* Noble Footwear`,
+      `*Store:* Shree Noble Footwear`,
       `*Date:* ${new Date().toLocaleString()}`,
       ``,
       `*Customer:* ${customer.name || "Walk-in Customer"}`,
@@ -374,7 +374,7 @@ function Sales() {
       ``,
       `✅ Thank you for shopping with us!`,
       `Need assistance? Reply here – we're happy to help.`,
-      `📍 Visit again: Noble Footwear`
+      `📍 Visit again: Shree Noble Footwear`
     );
     return lines.filter(Boolean).join("\n");
   };
@@ -432,7 +432,7 @@ function Sales() {
     doc.setTextColor(17, 24, 39);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
-    doc.text("NOBLE FOOTWEAR", 40, 42);
+    doc.text("SHREE NOBLE FOOTWEAR", 40, 42);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text("contact@noblefootwear.com | +91-XXXXXXXXXX", 40, 60);

@@ -247,7 +247,7 @@ function Inventory() {
     const lines = [
       `🧾 *Invoice Summary*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `*Store:* Noble Footwear`,
+      `*Store:* Shree Noble Footwear`,
       `*Date:* ${new Date().toLocaleString()}`,
       ``,
       `👟 *Product:* ${product?.name || "-"} (${product?.barcode || "N/A"})`,
@@ -258,7 +258,7 @@ function Inventory() {
       ``,
       `✅ Thank you for shopping with us!`,
       `Need assistance? Reply here – we're happy to help.`,
-      `📍 Visit again: Noble Footwear`,
+      `📍 Visit again: Shree Noble Footwear`,
       ``,
       `━━━━━━━━━━━━━━━━━━`,
     ];
@@ -861,7 +861,7 @@ function Inventory() {
                             doc.setTextColor(17, 24, 39);
                             doc.setFont("helvetica", "bold");
                             doc.setFontSize(22);
-                            doc.text("NOBLE FOOTWEAR", 40, 42);
+                            doc.text("SHREE NOBLE FOOTWEAR", 40, 42);
                             doc.setFont("helvetica", "normal");
                             doc.setFontSize(10);
                             doc.text(
