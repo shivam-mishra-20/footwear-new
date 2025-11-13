@@ -26,6 +26,8 @@ import {
   FiShoppingCart,
   FiCreditCard,
   FiFileText,
+  FiEdit2,
+  FiCheck,
 } from "react-icons/fi";
 import { TbScan } from "react-icons/tb";
 const SearchIcon = ({ className = "w-5 h-5 text-gray-400" }) => (
@@ -52,6 +54,12 @@ const CreditCardIcon = ({ className = "w-5 h-5" }) => (
 const DocumentIcon = ({ className = "w-5 h-5" }) => (
   <FiFileText className={className} aria-hidden="true" />
 );
+const EditIcon = ({ className = "w-4 h-4" }) => (
+  <FiEdit2 className={className} aria-hidden="true" />
+);
+const CheckIcon = ({ className = "w-4 h-4" }) => (
+  <FiCheck className={className} aria-hidden="true" />
+);
 
 function Sales() {
   const [products, setProducts] = useState([]);
@@ -67,6 +75,13 @@ function Sales() {
   const [paymentRef, setPaymentRef] = useState("");
   const [cashReceived, setCashReceived] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [invoiceContent, setInvoiceContent] = useState("");
+  const [invoicePhone, setInvoicePhone] = useState("");
+  const [invoiceError, setInvoiceError] = useState("");
+  const [invoiceSuccess, setInvoiceSuccess] = useState("");
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [globalDiscount, setGlobalDiscount] = useState(0);
 
   useEffect(() => {
     const q = query(
@@ -102,13 +117,16 @@ function Sales() {
         clone[idx] = { ...clone[idx], qty: qDesired };
         return clone;
       }
+      const originalPrice = Number(p.price || 0);
       return [
         ...prev,
         {
           id: p.id,
           name: p.name,
           barcode: p.barcode,
-          price: Number(p.price || 0),
+          mrp: originalPrice, // Maximum Retail Price (original)
+          price: originalPrice, // Selling Price (can be edited)
+          itemDiscount: 0, // Individual item discount
           qty: qDesired,
           stock: Number(p.stock || 0),
           category: p.category,
@@ -129,13 +147,55 @@ function Sales() {
     );
   };
 
+  const updateItemPrice = (id, newPrice) => {
+    setCart((prev) =>
+      prev.map((i) => {
+        if (i.id === id) {
+          const price = Number(newPrice) || 0;
+          const discount = Math.max(0, i.mrp - price);
+          return { ...i, price, itemDiscount: discount };
+        }
+        return i;
+      })
+    );
+  };
+
+  const updateItemDiscount = (id, discount) => {
+    setCart((prev) =>
+      prev.map((i) => {
+        if (i.id === id) {
+          const disc = Math.max(0, Math.min(i.mrp, Number(discount) || 0));
+          const newPrice = Math.max(0, i.mrp - disc);
+          return { ...i, price: newPrice, itemDiscount: disc };
+        }
+        return i;
+      })
+    );
+  };
+
   const removeFromCart = (id) =>
     setCart((prev) => prev.filter((i) => i.id !== id));
 
-  const total = useMemo(
+  const mrpTotal = useMemo(
+    () => cart.reduce((s, i) => s + i.mrp * i.qty, 0),
+    [cart]
+  );
+
+  const subtotal = useMemo(
     () => cart.reduce((s, i) => s + i.price * i.qty, 0),
     [cart]
   );
+
+  const itemDiscountTotal = useMemo(
+    () => cart.reduce((s, i) => s + i.itemDiscount * i.qty, 0),
+    [cart]
+  );
+
+  const total = useMemo(() => {
+    // Global discount is applied on SRP (subtotal after item discounts)
+    const globalDiscountAmount = (subtotal * globalDiscount) / 100;
+    return Math.max(0, subtotal - globalDiscountAmount);
+  }, [subtotal, globalDiscount]);
 
   const handleScan = (code) => {
     const item = products.find((p) => p.barcode === code);
@@ -218,6 +278,7 @@ function Sales() {
           paymentMethod === "Cash"
             ? Math.max(0, paidAmount - Number(total))
             : 0;
+        const totalDiscount = subtotal - total;
         tx.set(saleRef, {
           sale_id: saleId,
           created_at: serverTimestamp(),
@@ -227,11 +288,15 @@ function Sales() {
             id: i.id,
             name: i.name,
             barcode: i.barcode,
+            mrp: i.mrp,
             price: i.price,
+            itemDiscount: i.itemDiscount,
             qty: i.qty,
           })),
-          subtotal: total,
-          discount: 0,
+          subtotal: subtotal,
+          itemDiscountTotal: itemDiscountTotal,
+          globalDiscountPercent: globalDiscount,
+          totalDiscount: totalDiscount,
           total,
           payment: {
             method: paymentMethod,
@@ -251,6 +316,8 @@ function Sales() {
       setPaymentRef("");
       setCashReceived("");
       setShowPayment(false);
+      setGlobalDiscount(0);
+      setEditingItemId(null);
       setMsg({ type: "success", text: "Sale completed successfully." });
     } catch (err) {
       setMsg({ type: "error", text: err.message || "Checkout failed" });
@@ -258,9 +325,81 @@ function Sales() {
     setBusy(false);
   };
 
+  // Build WhatsApp invoice message
+  const buildWhatsAppMessage = () => {
+    const lines = [
+      `🧾 *Invoice Summary*`,
+      `━━━━━━━━━━━━━━━━━━`,
+      `*Store:* Noble Footwear`,
+      `*Date:* ${new Date().toLocaleString()}`,
+      ``,
+      `*Customer:* ${customer.name || "Walk-in Customer"}`,
+      customer.phone ? `*Phone:* ${customer.phone}` : "",
+      ``,
+      `*Items:*`,
+    ];
+    cart.forEach((item, idx) => {
+      const itemTotal = Number(item.price || 0) * Number(item.qty || 0);
+      let itemLine = `${idx + 1}. ${item.name} × ${item.qty}`;
+      if (item.itemDiscount > 0) {
+        itemLine += ` (₹${item.mrp} - ₹${item.itemDiscount})`;
+      }
+      itemLine += ` = ₹${itemTotal.toLocaleString("en-IN")}`;
+      lines.push(itemLine);
+    });
+    lines.push(``, `━━━━━━━━━━━━━━━━━━`);
+
+    if (subtotal > total) {
+      lines.push(`Subtotal: ₹${subtotal.toLocaleString("en-IN")}`);
+      if (itemDiscountTotal > 0) {
+        lines.push(
+          `Item Discounts: -₹${itemDiscountTotal.toLocaleString("en-IN")}`
+        );
+      }
+      if (globalDiscount > 0) {
+        const globalDiscAmt =
+          ((subtotal - itemDiscountTotal) * globalDiscount) / 100;
+        lines.push(
+          `Additional Discount (${globalDiscount}%): -₹${globalDiscAmt.toLocaleString(
+            "en-IN"
+          )}`
+        );
+      }
+      lines.push(`You Saved: ₹${(subtotal - total).toLocaleString("en-IN")}`);
+      lines.push(``);
+    }
+
+    lines.push(
+      `💰 *Total: ₹${total.toLocaleString("en-IN")}*`,
+      ``,
+      `✅ Thank you for shopping with us!`,
+      `Need assistance? Reply here – we're happy to help.`,
+      `📍 Visit again: Noble Footwear`
+    );
+    return lines.filter(Boolean).join("\n");
+  };
+
+  // WhatsApp encoder
+  const encodeWhatsAppMessage = (text) => {
+    return encodeURIComponent(text)
+      .replace(/%EF%B8%8F/g, "")
+      .replace(/%0A/g, "%0D%0A");
+  };
+
+  // Open invoice modal with pre-filled content
+  const openInvoiceModal = () => {
+    const invoiceText = buildWhatsAppMessage();
+    setInvoiceContent(invoiceText);
+    setInvoicePhone(customer.phone || "");
+    setInvoiceError("");
+    setInvoiceSuccess("");
+    setShowInvoiceModal(true);
+  };
+
+  // Generate PDF from cart
   const generateInvoicePdf = () => {
     const sale = {
-      sale_id: `TEMP-${Date.now()}`,
+      sale_id: `INV-${Date.now()}`,
       created_at: { toDate: () => new Date() },
       customer,
       items: cart,
@@ -287,53 +426,51 @@ function Sales() {
       doc.text("₹", xRight - width - gap, yPos);
     };
 
-    // Header
-    doc.setFontSize(20);
-    doc.text("NOBLE FOOTWEAR", 40, y);
-    y += 18;
+    // Header with branding
+    doc.setFillColor(243, 248, 255);
+    doc.rect(0, 0, pageWidth, 90, "F");
+    doc.setTextColor(17, 24, 39);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.text("NOBLE FOOTWEAR", 40, 42);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("GSTIN: —", 40, y);
-    y += 14;
-    doc.text("Address: 123, Business Street, City, State - 000000", 40, y);
-    y += 14;
-    doc.text("Phone: +91-XXXXXXXXXX | Email: contact@noblefootwear.com", 40, y);
-    y += 20;
+    doc.text("contact@noblefootwear.com | +91-XXXXXXXXXX", 40, 60);
 
-    doc.setFontSize(16);
+    y = 110;
+    doc.setFontSize(14);
     doc.text("TAX INVOICE", 40, y);
-    y += 18;
     doc.setFontSize(11);
-    const dateStr = sale.created_at?.toDate
-      ? sale.created_at.toDate().toLocaleString()
-      : new Date().toLocaleString();
-    doc.text(`Invoice No: ${sale.sale_id}`, 40, y);
-    textRight(`Date: ${dateStr}`, pageWidth - 40, y);
-    y += 18;
+    doc.text(`Invoice No: ${sale.sale_id}`, 40, y + 20);
+    doc.text(`Date: ${new Date().toLocaleString()}`, 40, y + 36);
 
+    // Customer details
+    y += 60;
     doc.setFontSize(12);
     doc.text("Bill To:", 40, y);
-    y += 14;
+    y += 16;
     doc.setFontSize(11);
-    doc.text(`${sale.customer?.name || "-"}`, 40, y);
+    doc.text(`${sale.customer?.name || "Walk-in Customer"}`, 40, y);
     y += 14;
     if (sale.customer?.phone) {
       doc.text(`Phone: ${sale.customer.phone}`, 40, y);
       y += 16;
     }
 
+    // Items table
     y += 6;
     const colItemLeft = 50;
     const colQtyRight = pageWidth - 260;
     const colPriceRight = pageWidth - 200;
     const colAmountRight = pageWidth - 40;
-    doc.setFillColor(240, 248, 255);
-    doc.rect(40, y, pageWidth - 80, 24, "F");
+    doc.setFillColor(240, 245, 255);
+    doc.rect(40, y, pageWidth - 80, 26, "F");
     doc.setFontSize(11);
-    doc.text("Item", colItemLeft, y + 16);
-    textRight("Qty", colQtyRight, y + 16);
-    textRight("Price", colPriceRight, y + 16);
-    textRight("Amount", colAmountRight, y + 16);
-    y += 28;
+    doc.text("Item", colItemLeft, y + 17);
+    textRight("Qty", colQtyRight, y + 17);
+    textRight("Price", colPriceRight, y + 17);
+    textRight("Amount", colAmountRight, y + 17);
+    y += 34;
 
     doc.setFontSize(10);
     sale.items.forEach((it) => {
@@ -350,28 +487,64 @@ function Sales() {
       }
     });
 
+    // Totals
     y += 8;
     doc.setDrawColor(200);
     doc.line(40, y, pageWidth - 40, y);
     y += 16;
     const totalsRight = colAmountRight;
-    const labelRight = totalsRight - 120;
+    const labelRight = totalsRight - 140;
     doc.setFontSize(11);
+
+    // Calculate values
+    const cartSubtotal = cart.reduce((s, i) => s + i.mrp * i.qty, 0);
+    const cartItemDiscount = cart.reduce(
+      (s, i) => s + i.itemDiscount * i.qty,
+      0
+    );
+    const afterItemDiscount = cartSubtotal - cartItemDiscount;
+    const globalDiscAmt = (afterItemDiscount * globalDiscount) / 100;
+
     textRight("Subtotal", labelRight, y);
-    drawCurrency(fmtINR(sale.subtotal ?? sale.total), totalsRight, y);
-    y += 16;
+    drawCurrency(fmtINR(cartSubtotal), totalsRight, y);
+    y += 14;
+
+    if (cartItemDiscount > 0) {
+      textRight("Item Discounts", labelRight, y);
+      doc.setTextColor(34, 197, 94); // green
+      drawCurrency(fmtINR(cartItemDiscount), totalsRight, y);
+      doc.setTextColor(17, 24, 39); // back to gray
+      y += 14;
+    }
+
+    if (globalDiscount > 0) {
+      textRight(`Discount (${globalDiscount}%)`, labelRight, y);
+      doc.setTextColor(34, 197, 94); // green
+      drawCurrency(fmtINR(globalDiscAmt), totalsRight, y);
+      doc.setTextColor(17, 24, 39); // back to gray
+      y += 14;
+    }
+
+    if (cartSubtotal > sale.total) {
+      y += 4;
+      doc.setDrawColor(220);
+      doc.line(labelRight - 20, y, pageWidth - 40, y);
+      y += 14;
+    }
+
     doc.setFontSize(12);
     textRight("Total", labelRight, y);
     drawCurrency(fmtINR(sale.total), totalsRight, y);
     y += 20;
 
+    // Footer
     y += 8;
     doc.setDrawColor(220);
     doc.line(40, y, pageWidth - 40, y);
     y += 16;
     doc.setFontSize(9);
     doc.text(
-      "Thank you for your business! Goods once sold will not be taken back.",
+      "Thank you for your business! Exchange within 7 days with original bill.",
       40,
       y
     );
@@ -634,10 +807,110 @@ function Sales() {
                               Code: {item.barcode}
                             </div>
                           </div>
-                          <div className="text-sm sm:text-base font-semibold text-gray-900 whitespace-nowrap">
-                            ₹{item.price * item.qty}
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              {item.itemDiscount > 0 && (
+                                <div className="text-xs text-gray-400 line-through">
+                                  ₹{item.mrp * item.qty}
+                                </div>
+                              )}
+                              <div className="text-sm sm:text-base font-semibold text-gray-900 whitespace-nowrap">
+                                ₹{item.price * item.qty}
+                              </div>
+                            </div>
+                            <button
+                              className="w-7 h-7 text-blue-600 hover:bg-blue-50 active:scale-95 rounded-lg transition-all duration-150 flex items-center justify-center flex-shrink-0"
+                              onClick={() =>
+                                setEditingItemId(
+                                  editingItemId === item.id ? null : item.id
+                                )
+                              }
+                              title="Edit Price"
+                            >
+                              {editingItemId === item.id ? (
+                                <CheckIcon className="w-3.5 h-3.5" />
+                              ) : (
+                                <EditIcon className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           </div>
                         </div>
+
+                        {/* Price editing section */}
+                        {editingItemId === item.id && (
+                          <div className="mb-2 p-2 bg-blue-50 rounded-lg space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  MRP
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.mrp}
+                                  onChange={(e) => {
+                                    const newMrp = Number(e.target.value) || 0;
+                                    setCart((prev) =>
+                                      prev.map((i) =>
+                                        i.id === item.id
+                                          ? {
+                                              ...i,
+                                              mrp: newMrp,
+                                              price: Math.max(
+                                                0,
+                                                newMrp - i.itemDiscount
+                                              ),
+                                            }
+                                          : i
+                                      )
+                                    );
+                                  }}
+                                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="MRP"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  SRP
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.price}
+                                  onChange={(e) =>
+                                    updateItemPrice(
+                                      item.id,
+                                      Number(e.target.value) || 0
+                                    )
+                                  }
+                                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Selling Price"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Item Discount (₹)
+                              </label>
+                              <input
+                                type="number"
+                                value={item.itemDiscount}
+                                onChange={(e) =>
+                                  updateItemDiscount(
+                                    item.id,
+                                    Number(e.target.value) || 0
+                                  )
+                                }
+                                max={item.mrp}
+                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Discount amount"
+                              />
+                              {item.itemDiscount > 0 && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  Saving: ₹{item.itemDiscount * item.qty}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -679,14 +952,82 @@ function Sales() {
 
                 {/* Total */}
                 {cart.length > 0 && (
-                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-100">
-                    <div className="flex justify-between items-center mb-3 sm:mb-4">
-                      <span className="text-base sm:text-lg font-semibold text-gray-900">
-                        Total
+                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-100 space-y-2">
+                    {itemDiscountTotal > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">MRP Total</span>
+                        <span className="font-medium text-gray-900">
+                          ₹{mrpTotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {itemDiscountTotal > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Item Discounts</span>
+                        <span className="font-medium text-green-600">
+                          -₹{itemDiscountTotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">
+                        Subtotal {itemDiscountTotal > 0 ? "(SRP)" : ""}
                       </span>
-                      <span className="text-lg sm:text-xl font-bold text-green-600">
-                        ₹{total.toLocaleString()}
+                      <span className="font-medium text-gray-900">
+                        ₹{subtotal.toLocaleString()}
                       </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-sm">
+                      <label className="text-gray-600">
+                        Additional Discount on SRP (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={globalDiscount}
+                        onChange={(e) =>
+                          setGlobalDiscount(
+                            Math.max(
+                              0,
+                              Math.min(100, Number(e.target.value) || 0)
+                            )
+                          )
+                        }
+                        className="w-20 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="0"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+
+                    {globalDiscount > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">
+                          Additional Discount ({globalDiscount}%)
+                        </span>
+                        <span className="font-medium text-green-600">
+                          -₹
+                          {((subtotal * globalDiscount) / 100).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-base sm:text-lg font-semibold text-gray-900">
+                          Total
+                        </span>
+                        <span className="text-lg sm:text-xl font-bold text-green-600">
+                          ₹{total.toLocaleString()}
+                        </span>
+                      </div>
+                      {(itemDiscountTotal > 0 || globalDiscount > 0) && (
+                        <div className="text-xs text-right text-green-600 mt-1">
+                          You saved: ₹{(mrpTotal - total).toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -750,7 +1091,7 @@ function Sales() {
                   <button
                     className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 text-white font-medium rounded-lg sm:rounded-xl hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center justify-center flex-shrink-0"
                     disabled={cart.length === 0}
-                    onClick={generateInvoicePdf}
+                    onClick={openInvoiceModal}
                     title="Generate Invoice"
                   >
                     <DocumentIcon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -795,6 +1136,165 @@ function Sales() {
                     onClose={() => setShowScanner(false)}
                     height={320}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invoice Modal */}
+        {showInvoiceModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                    Generate Invoice
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowInvoiceModal(false);
+                      setInvoiceError("");
+                      setInvoiceSuccess("");
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-150"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4 sm:space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      WhatsApp Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter recipient phone with country code (e.g. 919876543210)"
+                      value={invoicePhone}
+                      onChange={(e) => setInvoicePhone(e.target.value)}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Invoice Content
+                    </label>
+                    <textarea
+                      value={invoiceContent}
+                      onChange={(e) => setInvoiceContent(e.target.value)}
+                      rows={12}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-xs sm:text-sm resize-none"
+                    />
+                  </div>
+
+                  {(invoiceError || invoiceSuccess) && (
+                    <div className="space-y-2">
+                      {invoiceError && (
+                        <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg sm:rounded-xl">
+                          <p className="text-red-700 text-xs sm:text-sm font-medium">
+                            {invoiceError}
+                          </p>
+                        </div>
+                      )}
+                      {invoiceSuccess && (
+                        <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg sm:rounded-xl">
+                          <p className="text-green-700 text-xs sm:text-sm font-medium">
+                            {invoiceSuccess}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-end mt-4 sm:mt-6">
+                  <button
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-100 text-gray-700 font-medium rounded-lg sm:rounded-xl hover:bg-gray-200 transition-colors duration-200 text-sm sm:text-base"
+                    onClick={() => {
+                      setShowInvoiceModal(false);
+                      setInvoiceError("");
+                      setInvoiceSuccess("");
+                    }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white font-medium rounded-lg sm:rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 justify-center text-sm sm:text-base"
+                    onClick={() => {
+                      setInvoiceError("");
+                      setInvoiceSuccess("");
+                      try {
+                        generateInvoicePdf();
+                        setInvoiceSuccess(
+                          "PDF generated. You can also share it on WhatsApp."
+                        );
+                      } catch (err) {
+                        setInvoiceError("Failed to generate PDF.");
+                      }
+                    }}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Generate PDF
+                  </button>
+                  <button
+                    className="px-4 sm:px-6 py-2.5 sm:py-3 bg-green-600 text-white font-medium rounded-lg sm:rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center gap-2 justify-center text-sm sm:text-base"
+                    onClick={async () => {
+                      setInvoiceError("");
+                      setInvoiceSuccess("");
+                      const digits = (invoicePhone || "").replace(/\D/g, "");
+                      if (!digits) {
+                        setInvoiceError("Please enter a valid phone number.");
+                        return;
+                      }
+                      try {
+                        const msg = invoiceContent || buildWhatsAppMessage();
+                        const waUrl = `https://api.whatsapp.com/send?phone=${digits}&text=${encodeWhatsAppMessage(
+                          msg
+                        )}`;
+                        window.open(waUrl, "_blank");
+                        setInvoiceSuccess(
+                          "WhatsApp opened with invoice. Please complete send in WhatsApp."
+                        );
+                      } catch (err) {
+                        setInvoiceError("Failed to open WhatsApp.");
+                      }
+                    }}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                    </svg>
+                    Send via WhatsApp
+                  </button>
                 </div>
               </div>
             </div>
