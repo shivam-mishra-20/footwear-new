@@ -81,7 +81,6 @@ function Sales() {
   const [invoiceError, setInvoiceError] = useState("");
   const [invoiceSuccess, setInvoiceSuccess] = useState("");
   const [editingItemId, setEditingItemId] = useState(null);
-  const [globalDiscount, setGlobalDiscount] = useState(0);
 
   useEffect(() => {
     const q = query(
@@ -124,9 +123,8 @@ function Sales() {
           id: p.id,
           name: p.name,
           barcode: p.barcode,
-          mrp: originalPrice, // Maximum Retail Price (original)
+          mrp: originalPrice, // Maximum Retail Price (can be edited)
           price: originalPrice, // Selling Price (can be edited)
-          itemDiscount: 0, // Individual item discount
           qty: qDesired,
           stock: Number(p.stock || 0),
           category: p.category,
@@ -152,21 +150,19 @@ function Sales() {
       prev.map((i) => {
         if (i.id === id) {
           const price = Number(newPrice) || 0;
-          const discount = Math.max(0, i.mrp - price);
-          return { ...i, price, itemDiscount: discount };
+          return { ...i, price };
         }
         return i;
       })
     );
   };
 
-  const updateItemDiscount = (id, discount) => {
+  const updateItemMrp = (id, newMrp) => {
     setCart((prev) =>
       prev.map((i) => {
         if (i.id === id) {
-          const disc = Math.max(0, Math.min(i.mrp, Number(discount) || 0));
-          const newPrice = Math.max(0, i.mrp - disc);
-          return { ...i, price: newPrice, itemDiscount: disc };
+          const mrp = Number(newMrp) || 0;
+          return { ...i, mrp };
         }
         return i;
       })
@@ -181,21 +177,10 @@ function Sales() {
     [cart]
   );
 
-  const subtotal = useMemo(
+  const total = useMemo(
     () => cart.reduce((s, i) => s + i.price * i.qty, 0),
     [cart]
   );
-
-  const itemDiscountTotal = useMemo(
-    () => cart.reduce((s, i) => s + i.itemDiscount * i.qty, 0),
-    [cart]
-  );
-
-  const total = useMemo(() => {
-    // Global discount is applied on SRP (subtotal after item discounts)
-    const globalDiscountAmount = (subtotal * globalDiscount) / 100;
-    return Math.max(0, subtotal - globalDiscountAmount);
-  }, [subtotal, globalDiscount]);
 
   const handleScan = (code) => {
     const item = products.find((p) => p.barcode === code);
@@ -278,7 +263,6 @@ function Sales() {
           paymentMethod === "Cash"
             ? Math.max(0, paidAmount - Number(total))
             : 0;
-        const totalDiscount = subtotal - total;
         tx.set(saleRef, {
           sale_id: saleId,
           created_at: serverTimestamp(),
@@ -290,13 +274,9 @@ function Sales() {
             barcode: i.barcode,
             mrp: i.mrp,
             price: i.price,
-            itemDiscount: i.itemDiscount,
             qty: i.qty,
           })),
-          subtotal: subtotal,
-          itemDiscountTotal: itemDiscountTotal,
-          globalDiscountPercent: globalDiscount,
-          totalDiscount: totalDiscount,
+          mrpTotal: mrpTotal,
           total,
           payment: {
             method: paymentMethod,
@@ -316,7 +296,6 @@ function Sales() {
       setPaymentRef("");
       setCashReceived("");
       setShowPayment(false);
-      setGlobalDiscount(0);
       setEditingItemId(null);
       setMsg({ type: "success", text: "Sale completed successfully." });
     } catch (err) {
@@ -348,26 +327,6 @@ function Sales() {
       lines.push(itemLine);
     });
     lines.push(``, `━━━━━━━━━━━━━━━━━━`);
-
-    if (subtotal > total) {
-      lines.push(`Subtotal: ₹${subtotal.toLocaleString("en-IN")}`);
-      if (itemDiscountTotal > 0) {
-        lines.push(
-          `Item Discounts: -₹${itemDiscountTotal.toLocaleString("en-IN")}`
-        );
-      }
-      if (globalDiscount > 0) {
-        const globalDiscAmt =
-          ((subtotal - itemDiscountTotal) * globalDiscount) / 100;
-        lines.push(
-          `Additional Discount (${globalDiscount}%): -₹${globalDiscAmt.toLocaleString(
-            "en-IN"
-          )}`
-        );
-      }
-      lines.push(`You Saved: ₹${(subtotal - total).toLocaleString("en-IN")}`);
-      lines.push(``);
-    }
 
     lines.push(
       `💰 *Total: ₹${total.toLocaleString("en-IN")}*`,
@@ -497,35 +456,18 @@ function Sales() {
     doc.setFontSize(11);
 
     // Calculate values
-    const cartSubtotal = cart.reduce((s, i) => s + i.mrp * i.qty, 0);
-    const cartItemDiscount = cart.reduce(
-      (s, i) => s + i.itemDiscount * i.qty,
-      0
-    );
-    const afterItemDiscount = cartSubtotal - cartItemDiscount;
-    const globalDiscAmt = (afterItemDiscount * globalDiscount) / 100;
+    const cartMrpTotal = cart.reduce((s, i) => s + i.mrp * i.qty, 0);
+    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
-    textRight("Subtotal", labelRight, y);
-    drawCurrency(fmtINR(cartSubtotal), totalsRight, y);
-    y += 14;
-
-    if (cartItemDiscount > 0) {
-      textRight("Item Discounts", labelRight, y);
-      doc.setTextColor(34, 197, 94); // green
-      drawCurrency(fmtINR(cartItemDiscount), totalsRight, y);
+    if (cartMrpTotal > cartTotal) {
+      textRight("MRP Total", labelRight, y);
+      doc.setTextColor(156, 163, 175); // gray
+      drawCurrency(fmtINR(cartMrpTotal), totalsRight, y);
       doc.setTextColor(17, 24, 39); // back to gray
       y += 14;
     }
 
-    if (globalDiscount > 0) {
-      textRight(`Discount (${globalDiscount}%)`, labelRight, y);
-      doc.setTextColor(34, 197, 94); // green
-      drawCurrency(fmtINR(globalDiscAmt), totalsRight, y);
-      doc.setTextColor(17, 24, 39); // back to gray
-      y += 14;
-    }
-
-    if (cartSubtotal > sale.total) {
+    if (cartMrpTotal > sale.total) {
       y += 4;
       doc.setDrawColor(220);
       doc.line(labelRight - 20, y, pageWidth - 40, y);
@@ -809,13 +751,13 @@ function Sales() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right">
-                              {item.itemDiscount > 0 && (
+                              {item.mrp !== item.price && (
                                 <div className="text-xs text-gray-400 line-through">
-                                  ₹{item.mrp * item.qty}
+                                  ₹{(item.mrp * item.qty).toLocaleString()}
                                 </div>
                               )}
                               <div className="text-sm sm:text-base font-semibold text-gray-900 whitespace-nowrap">
-                                ₹{item.price * item.qty}
+                                ₹{(item.price * item.qty).toLocaleString()}
                               </div>
                             </div>
                             <button
@@ -838,39 +780,28 @@ function Sales() {
 
                         {/* Price editing section */}
                         {editingItemId === item.id && (
-                          <div className="mb-2 p-2 bg-blue-50 rounded-lg space-y-2">
+                          <div className="mb-2 p-2 bg-blue-50 rounded-lg">
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  MRP
+                                  MRP (₹)
                                 </label>
                                 <input
                                   type="number"
                                   value={item.mrp}
-                                  onChange={(e) => {
-                                    const newMrp = Number(e.target.value) || 0;
-                                    setCart((prev) =>
-                                      prev.map((i) =>
-                                        i.id === item.id
-                                          ? {
-                                              ...i,
-                                              mrp: newMrp,
-                                              price: Math.max(
-                                                0,
-                                                newMrp - i.itemDiscount
-                                              ),
-                                            }
-                                          : i
-                                      )
-                                    );
-                                  }}
+                                  onChange={(e) =>
+                                    updateItemMrp(
+                                      item.id,
+                                      Number(e.target.value) || 0
+                                    )
+                                  }
                                   className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                   placeholder="MRP"
                                 />
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  SRP
+                                  SRP (₹)
                                 </label>
                                 <input
                                   type="number"
@@ -885,29 +816,6 @@ function Sales() {
                                   placeholder="Selling Price"
                                 />
                               </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Item Discount (₹)
-                              </label>
-                              <input
-                                type="number"
-                                value={item.itemDiscount}
-                                onChange={(e) =>
-                                  updateItemDiscount(
-                                    item.id,
-                                    Number(e.target.value) || 0
-                                  )
-                                }
-                                max={item.mrp}
-                                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Discount amount"
-                              />
-                              {item.itemDiscount > 0 && (
-                                <div className="text-xs text-green-600 mt-1">
-                                  Saving: ₹{item.itemDiscount * item.qty}
-                                </div>
-                              )}
                             </div>
                           </div>
                         )}
@@ -953,63 +861,11 @@ function Sales() {
                 {/* Total */}
                 {cart.length > 0 && (
                   <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-100 space-y-2">
-                    {itemDiscountTotal > 0 && (
+                    {mrpTotal > total && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">MRP Total</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-400 line-through">
                           ₹{mrpTotal.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-
-                    {itemDiscountTotal > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Item Discounts</span>
-                        <span className="font-medium text-green-600">
-                          -₹{itemDiscountTotal.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">
-                        Subtotal {itemDiscountTotal > 0 ? "(SRP)" : ""}
-                      </span>
-                      <span className="font-medium text-gray-900">
-                        ₹{subtotal.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-sm">
-                      <label className="text-gray-600">
-                        Additional Discount on SRP (%)
-                      </label>
-                      <input
-                        type="number"
-                        value={globalDiscount}
-                        onChange={(e) =>
-                          setGlobalDiscount(
-                            Math.max(
-                              0,
-                              Math.min(100, Number(e.target.value) || 0)
-                            )
-                          )
-                        }
-                        className="w-20 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="0"
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-
-                    {globalDiscount > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">
-                          Additional Discount ({globalDiscount}%)
-                        </span>
-                        <span className="font-medium text-green-600">
-                          -₹
-                          {((subtotal * globalDiscount) / 100).toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -1023,7 +879,7 @@ function Sales() {
                           ₹{total.toLocaleString()}
                         </span>
                       </div>
-                      {(itemDiscountTotal > 0 || globalDiscount > 0) && (
+                      {mrpTotal > total && (
                         <div className="text-xs text-right text-green-600 mt-1">
                           You saved: ₹{(mrpTotal - total).toLocaleString()}
                         </div>
