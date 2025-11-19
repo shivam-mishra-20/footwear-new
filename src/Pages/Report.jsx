@@ -271,9 +271,13 @@ function Report() {
     doc.text("TAX INVOICE", 40, y);
     y += 18;
     doc.setFontSize(11);
-    const dateStr = sale.created_at?.toDate
-      ? sale.created_at.toDate().toLocaleString()
-      : new Date().toLocaleString();
+    const saleDate = sale.created_at?.toDate
+      ? sale.created_at.toDate()
+      : new Date();
+    const day = String(saleDate.getDate()).padStart(2, "0");
+    const month = String(saleDate.getMonth() + 1).padStart(2, "0");
+    const year = String(saleDate.getFullYear()).slice(-2);
+    const dateStr = `${day}/${month}/${year}`;
     doc.text(`Invoice No: ${sale.sale_id}`, 40, y);
     textRight(`Date: ${dateStr}`, pageWidth - 40, y);
     y += 18;
@@ -307,31 +311,39 @@ function Report() {
     doc.setFontSize(10);
     items.forEach((it) => {
       const itemName = it.name || "";
-      const hasMRP = it.mrp && it.itemDiscount > 0;
+      const itemMrp = Number(it.mrp || 0);
+      const itemPrice = Number(it.price || 0);
+      const itemQty = Number(it.qty || 0);
+      const itemDiscount = (itemMrp - itemPrice) * itemQty;
+      const amount = itemPrice * itemQty;
+      const hasDiscount = itemDiscount > 0;
 
       // Show item name
       doc.text(itemName, colItemLeft, y);
+      textRight(String(itemQty), colQtyRight, y);
 
-      // Show MRP if there's an item discount
-      if (hasMRP) {
+      if (hasDiscount) {
+        const mrpTotal = itemMrp * itemQty;
+        drawCurrency(fmtINR(mrpTotal), colPriceRight, y);
+        drawCurrency(fmtINR(mrpTotal), colAmountRight, y);
         y += 12;
+
         doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(
-          `  MRP: ${fmtINR(it.mrp)} - Disc: ${fmtINR(it.itemDiscount)}`,
-          colItemLeft,
-          y
-        );
+        doc.setTextColor(34, 197, 94);
+        doc.text(`  Saved: ${fmtINR(itemDiscount)}`, colItemLeft, y);
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
-        y -= 12;
+        y += 10;
+
+        doc.text(`  Total:`, colItemLeft, y);
+        drawCurrency(fmtINR(amount), colAmountRight, y);
+        y += 16;
+      } else {
+        drawCurrency(fmtINR(itemPrice), colPriceRight, y);
+        drawCurrency(fmtINR(amount), colAmountRight, y);
+        y += 16;
       }
 
-      const amount = Number(it.price || 0) * Number(it.qty || 0);
-      textRight(String(it.qty), colQtyRight, y);
-      drawCurrency(fmtINR(it.price), colPriceRight, y);
-      drawCurrency(fmtINR(amount), colAmountRight, y);
-      y += hasMRP ? 24 : 16;
       if (y > 760) {
         doc.addPage();
         doc.setFont("helvetica", "normal");
@@ -440,15 +452,20 @@ function Report() {
 
   // Build WhatsApp invoice message for a sale
   const buildWhatsAppMessage = (sale) => {
+    const formatDate = () => {
+      const saleDate = sale.created_at?.toDate
+        ? sale.created_at.toDate()
+        : new Date();
+      const day = String(saleDate.getDate()).padStart(2, "0");
+      const month = String(saleDate.getMonth() + 1).padStart(2, "0");
+      const year = String(saleDate.getFullYear()).slice(-2);
+      return `${day}/${month}/${year}`;
+    };
+
     const lines = [
-      `🧾 *Invoice Summary*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `*Store:* Shree Noble Footwear`,
-      `*Date:* ${
-        sale.created_at?.toDate
-          ? sale.created_at.toDate().toLocaleString()
-          : new Date().toLocaleString()
-      }`,
+      `*Shree Noble Footwear*`,
+      `*Date:* ${formatDate()}`,
       `*Invoice No:* ${sale.sale_id}`,
       ``,
       `*Customer:* ${sale.customer?.name || "Walk-in Customer"}`,
@@ -457,64 +474,31 @@ function Report() {
       `*Items:*`,
     ];
     (sale.items || []).forEach((item, idx) => {
-      const itemTotal = Number(item.price || 0) * Number(item.qty || 0);
-      let itemLine = `${idx + 1}. ${item.name} × ${item.qty}`;
+      const itemMrp = Number(item.mrp || 0);
+      const itemPrice = Number(item.price || 0);
+      const itemQty = Number(item.qty || 0);
+      const itemDiscount = (itemMrp - itemPrice) * itemQty;
+      const itemTotal = itemPrice * itemQty;
 
-      // Show MRP and item discount if applicable
-      if (item.mrp && item.itemDiscount > 0) {
-        itemLine += ` (MRP: ₹${Number(item.mrp).toLocaleString("en-IN")})`;
-        itemLine += `\n   SRP: ₹${Number(item.price).toLocaleString(
-          "en-IN"
-        )} × ${item.qty} = ₹${itemTotal.toLocaleString("en-IN")}`;
-        itemLine += `\n   _Discount: ₹${Number(
-          item.itemDiscount
-        ).toLocaleString("en-IN")}/item_`;
+      let itemLine = `${idx + 1}. ${item.name} × ${itemQty}`;
+
+      if (itemDiscount > 0) {
+        const mrpTotal = itemMrp * itemQty;
+        itemLine += ` = ₹${mrpTotal.toLocaleString("en-IN")}`;
+        lines.push(itemLine);
+        lines.push(`   Saved: ₹${itemDiscount.toLocaleString("en-IN")}`);
+        lines.push(`   Total: ₹${itemTotal.toLocaleString("en-IN")}`);
       } else {
         itemLine += ` = ₹${itemTotal.toLocaleString("en-IN")}`;
+        lines.push(itemLine);
       }
-
-      lines.push(itemLine);
     });
 
     lines.push(``, `━━━━━━━━━━━━━━━━━━`);
 
-    // Show pricing breakdown
-    const itemDiscountTotal = Number(sale.itemDiscountTotal || 0);
-    const globalDiscountPercent = Number(sale.globalDiscountPercent || 0);
-    const totalDiscountAmount = Number(sale.totalDiscount || 0);
-
-    if (itemDiscountTotal > 0) {
-      const mrpTotal = Number(sale.subtotal || 0) + itemDiscountTotal;
-      lines.push(`MRP Total: ₹${mrpTotal.toLocaleString("en-IN")}`);
-      lines.push(
-        `Item Discounts: -₹${itemDiscountTotal.toLocaleString("en-IN")}`
-      );
-    }
-
-    if (globalDiscountPercent > 0 || itemDiscountTotal > 0) {
-      lines.push(
-        `Subtotal (SRP): ₹${Number(sale.subtotal || 0).toLocaleString("en-IN")}`
-      );
-    }
-
-    if (globalDiscountPercent > 0 && totalDiscountAmount > 0) {
-      lines.push(
-        `Additional Discount (${globalDiscountPercent}%): -₹${totalDiscountAmount.toLocaleString(
-          "en-IN"
-        )}`
-      );
-    }
-
     lines.push(
       `💰 *Total: ₹${Number(sale.total || 0).toLocaleString("en-IN")}*`
     );
-
-    // Show total savings
-    const totalSavings =
-      Number(sale.subtotal || 0) + itemDiscountTotal - Number(sale.total || 0);
-    if (totalSavings > 0) {
-      lines.push(`🎉 *You Saved: ₹${totalSavings.toLocaleString("en-IN")}*`);
-    }
 
     lines.push(``);
 

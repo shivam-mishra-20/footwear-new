@@ -426,7 +426,6 @@ function Sales() {
       return `${day}/${month}/${year}`;
     };
     const lines = [
-      `━━━━━━━━━━━━━━━━━━`,
       `*Shree Noble Footwear*`,
       `*Date:* ${formatDate()}`,
       ``,
@@ -462,7 +461,8 @@ function Sales() {
       ``,
       `✅ Thank you for shopping with us!`,
       `Need assistance? Reply here – we're happy to help.`,
-      `📍 Visit again: *Shree Noble Footwear*`
+      `Visit again:`,
+      `*Shree Noble Footwear*`
     );
     return lines.filter(Boolean).join("\n");
   };
