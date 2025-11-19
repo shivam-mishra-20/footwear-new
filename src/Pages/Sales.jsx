@@ -418,11 +418,17 @@ function Sales() {
 
   // Build WhatsApp invoice message
   const buildWhatsAppMessage = () => {
+    const formatDate = () => {
+      const d = new Date();
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const year = String(d.getFullYear()).slice(-2);
+      return `${day}/${month}/${year}`;
+    };
     const lines = [
-      `🧾 *Invoice Summary*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `*Store:* Shree Noble Footwear`,
-      `*Date:* ${new Date().toLocaleString()}`,
+      `*Shree Noble Footwear*`,
+      `*Date:* ${formatDate()}`,
       ``,
       `*Customer:* ${customer.name || "Walk-in Customer"}`,
       customer.phone ? `*Phone:* ${customer.phone}` : "",
@@ -430,35 +436,33 @@ function Sales() {
       `*Items:*`,
     ];
     cart.forEach((item, idx) => {
-      const itemTotal = Number(item.price || 0) * Number(item.qty || 0);
-      const itemName = item.size
-        ? `${item.name} (Size: ${item.size})`
-        : item.name;
-      let itemLine = `${idx + 1}. ${itemName} × ${item.qty}`;
-      if (item.itemDiscount > 0) {
-        itemLine += ` (₹${item.mrp} - ₹${item.itemDiscount})`;
+      const itemMrp = Number(item.mrp || 0);
+      const itemPrice = Number(item.price || 0);
+      const itemQty = Number(item.qty || 0);
+      const itemDiscount = (itemMrp - itemPrice) * itemQty;
+      const itemTotal = itemPrice * itemQty;
+
+      let itemLine = `${idx + 1}. ${item.name} × ${itemQty}`;
+
+      if (itemDiscount > 0) {
+        const mrpTotal = itemMrp * itemQty;
+        itemLine += ` = ₹${mrpTotal.toLocaleString("en-IN")}`;
+        lines.push(itemLine);
+        lines.push(`   Saved: ₹${itemDiscount.toLocaleString("en-IN")}`);
+        lines.push(`   Total: ₹${itemTotal.toLocaleString("en-IN")}`);
+      } else {
+        itemLine += ` = ₹${itemTotal.toLocaleString("en-IN")}`;
+        lines.push(itemLine);
       }
-      itemLine += ` = ₹${itemTotal.toLocaleString("en-IN")}`;
-      lines.push(itemLine);
     });
     lines.push(``, `━━━━━━━━━━━━━━━━━━`);
-
-    // Calculate savings
-    const cartMrpTotal = cart.reduce((s, i) => s + i.mrp * i.qty, 0);
-    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    const totalSavings = cartMrpTotal - cartTotal;
-
-    if (totalSavings > 0) {
-      lines.push(`🎉 *You Saved: ₹${totalSavings.toLocaleString("en-IN")}*`);
-      lines.push(``);
-    }
 
     lines.push(
       `💰 *Total: ₹${total.toLocaleString("en-IN")}*`,
       ``,
       `✅ Thank you for shopping with us!`,
       `Need assistance? Reply here – we're happy to help.`,
-      `📍 Visit again: Shree Noble Footwear`
+      `📍 Visit again: *Shree Noble Footwear*`
     );
     return lines.filter(Boolean).join("\n");
   };
@@ -526,7 +530,11 @@ function Sales() {
     doc.text("TAX INVOICE", 40, y);
     doc.setFontSize(11);
     doc.text(`Invoice No: ${sale.sale_id}`, 40, y + 20);
-    doc.text(`Date: ${new Date().toLocaleString()}`, 40, y + 36);
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = String(d.getFullYear()).slice(-2);
+    doc.text(`Date: ${day}/${month}/${year}`, 40, y + 36);
 
     // Customer details
     y += 60;
