@@ -431,7 +431,10 @@ function Sales() {
     ];
     cart.forEach((item, idx) => {
       const itemTotal = Number(item.price || 0) * Number(item.qty || 0);
-      let itemLine = `${idx + 1}. ${item.name} × ${item.qty}`;
+      const itemName = item.size
+        ? `${item.name} (Size: ${item.size})`
+        : item.name;
+      let itemLine = `${idx + 1}. ${itemName} × ${item.qty}`;
       if (item.itemDiscount > 0) {
         itemLine += ` (₹${item.mrp} - ₹${item.itemDiscount})`;
       }
@@ -439,6 +442,16 @@ function Sales() {
       lines.push(itemLine);
     });
     lines.push(``, `━━━━━━━━━━━━━━━━━━`);
+
+    // Calculate savings
+    const cartMrpTotal = cart.reduce((s, i) => s + i.mrp * i.qty, 0);
+    const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const totalSavings = cartMrpTotal - cartTotal;
+
+    if (totalSavings > 0) {
+      lines.push(`🎉 *You Saved: ₹${totalSavings.toLocaleString("en-IN")}*`);
+      lines.push(``);
+    }
 
     lines.push(
       `💰 *Total: ₹${total.toLocaleString("en-IN")}*`,
