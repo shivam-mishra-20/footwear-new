@@ -22,6 +22,8 @@ import {
   FiTrendingUp,
   FiEdit2,
   FiTrash2,
+  FiSearch,
+  FiFilter,
 } from "react-icons/fi";
 const ReportIcon = ({ className = "w-6 h-6" }) => (
   <FiBarChart2 className={className} aria-hidden="true" />
@@ -53,6 +55,12 @@ const EditIcon = ({ className = "w-4 h-4" }) => (
 const DeleteIcon = ({ className = "w-4 h-4" }) => (
   <FiTrash2 className={className} aria-hidden="true" />
 );
+const SearchIcon = ({ className = "w-4 h-4" }) => (
+  <FiSearch className={className} aria-hidden="true" />
+);
+const FilterIcon = ({ className = "w-4 h-4" }) => (
+  <FiFilter className={className} aria-hidden="true" />
+);
 
 function sum(items, f) {
   return items.reduce((s, x) => s + (f ? f(x) : x), 0);
@@ -82,6 +90,21 @@ function Report() {
   const [showItemsModal, setShowItemsModal] = useState(false);
   const [showRevenueModal, setShowRevenueModal] = useState(false);
 
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+
+  // Sort states
+  const [sortBy, setSortBy] = useState("date");
+  const [sortOrder, setSortOrder] = useState("desc");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     const q = query(collection(db, "Sales"), orderBy("created_at", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -95,10 +118,84 @@ function Report() {
     const days = Number(range);
     const since = Date.now() - days * 24 * 3600 * 1000;
     return sales.filter((s) => {
+      // Date range filter (existing)
       const ts = s.created_at?.toMillis ? s.created_at.toMillis() : Date.now();
-      return ts >= since;
+      if (ts < since) return false;
+
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        if (
+          !(
+            (s.sale_id || s.id || "").toLowerCase().includes(searchLower) ||
+            (s.customer?.name || "").toLowerCase().includes(searchLower) ||
+            (s.customer?.email || "").toLowerCase().includes(searchLower) ||
+            (s.customer?.phone || "").toLowerCase().includes(searchLower)
+          )
+        )
+          return false;
+      }
+
+      // Min amount filter
+      const amt = Number(s.total || s.amount || 0);
+      if (minAmount) {
+        const min = Number(minAmount) || 0;
+        if (amt < min) return false;
+      }
+
+      // Date range filters (from/to)
+      const saleDate = s.created_at?.toDate ? s.created_at.toDate() : null;
+      if (filterFrom && saleDate) {
+        const from = new Date(filterFrom);
+        if (saleDate < from) return false;
+      }
+      if (filterTo && saleDate) {
+        const to = new Date(filterTo);
+        to.setHours(23, 59, 59, 999);
+        if (saleDate > to) return false;
+      }
+
+      return true;
     });
-  }, [sales, range]);
+  }, [sales, range, searchTerm, filterFrom, filterTo, minAmount]);
+
+  // Sort filtered sales
+  const sortedSales = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      if (sortBy === "date") {
+        const dateA = a.created_at?.toMillis ? a.created_at.toMillis() : 0;
+        const dateB = b.created_at?.toMillis ? b.created_at.toMillis() : 0;
+        comparison = dateA - dateB;
+      } else if (sortBy === "amount") {
+        const amtA = Number(a.total || a.amount || 0);
+        const amtB = Number(b.total || b.amount || 0);
+        comparison = amtA - amtB;
+      } else if (sortBy === "customer") {
+        const nameA = (a.customer?.name || "Walk-in Customer").toLowerCase();
+        const nameB = (b.customer?.name || "Walk-in Customer").toLowerCase();
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortBy === "invoice") {
+        const idA = (a.sale_id || a.id || "").toLowerCase();
+        const idB = (b.sale_id || b.id || "").toLowerCase();
+        comparison = idA.localeCompare(idB);
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [filtered, sortBy, sortOrder]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedSales.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSales = sortedSales.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [range, searchTerm, filterFrom, filterTo, minAmount, sortBy, sortOrder]);
 
   const totals = useMemo(() => {
     const orders = filtered.length;
@@ -748,7 +845,7 @@ function Report() {
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100">
           {/* Table Header */}
           <div className="p-4 sm:p-6 border-b border-gray-100">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <div>
                 <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">
                   Sales Transactions
@@ -758,7 +855,119 @@ function Report() {
                   {filtered.length !== 1 ? "s" : ""} in selected period
                 </p>
               </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* Search Input */}
+                <div className="relative flex-1 sm:flex-initial">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <SearchIcon className="text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm w-full sm:w-64"
+                  />
+                </div>
+                {/* Toggle filter button */}
+                <button
+                  onClick={() => setShowFilter((s) => !s)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-150"
+                >
+                  <FilterIcon />
+                  <span className="hidden sm:inline">Filter</span>
+                </button>
+              </div>
             </div>
+
+            {/* Filter panel */}
+            {showFilter && (
+              <div className="mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600">From</label>
+                    <input
+                      type="date"
+                      value={filterFrom}
+                      onChange={(e) => setFilterFrom(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">To</label>
+                    <input
+                      type="date"
+                      value={filterTo}
+                      onChange={(e) => setFilterTo(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">
+                      Min Amount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={minAmount}
+                      onChange={(e) => setMinAmount(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Sort Options */}
+                <div className="border-t border-gray-200 pt-4">
+                  <label className="text-xs text-gray-600 mb-2 block">
+                    Sort By
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="date">Date</option>
+                      <option value="amount">Amount</option>
+                      <option value="customer">Customer</option>
+                      <option value="invoice">Sale ID</option>
+                    </select>
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value)}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="desc">Descending</option>
+                      <option value="asc">Ascending</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      setShowFilter(false);
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFilterFrom("");
+                      setFilterTo("");
+                      setMinAmount("");
+                      setSearchTerm("");
+                      setSortBy("date");
+                      setSortOrder("desc");
+                    }}
+                    className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Table Content */}
@@ -794,7 +1003,7 @@ function Report() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filtered.map((sale) => (
+                      {paginatedSales.map((sale) => (
                         <tr
                           key={sale.id}
                           className="hover:bg-gray-50 transition-colors duration-150"
@@ -913,7 +1122,7 @@ function Report() {
 
                 {/* Mobile Card List (visible on mobile only) */}
                 <div className="md:hidden space-y-3 p-3">
-                  {filtered.map((sale) => (
+                  {paginatedSales.map((sale) => (
                     <div
                       key={sale.id}
                       className="bg-white border border-gray-100 rounded-lg p-4 space-y-3"
@@ -1050,6 +1259,105 @@ function Report() {
               </div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {sortedSales.length > 0 && (
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Results info */}
+                <div className="text-xs sm:text-sm text-gray-600">
+                  Page{" "}
+                  <span className="font-medium text-gray-900">
+                    {currentPage}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-medium text-gray-900">
+                    {totalPages}
+                  </span>{" "}
+                  • Total{" "}
+                  <span className="font-medium text-gray-900">
+                    {sortedSales.length}
+                  </span>{" "}
+                  transactions
+                </div>
+
+                {/* Navigation */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="p-1.5 sm:p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                    title="First page"
+                  >
+                    <svg
+                      className="w-4 h-4 sm:w-5 sm:h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                  >
+                    Previous
+                  </button>
+
+                  <div className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 rounded-xl">
+                    <span className="text-xs sm:text-sm font-semibold text-blue-600">
+                      {currentPage}
+                    </span>
+                    <span className="text-xs sm:text-sm text-gray-400">/</span>
+                    <span className="text-xs sm:text-sm text-gray-600">
+                      {totalPages}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                  >
+                    Next
+                  </button>
+
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 sm:p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                    title="Last page"
+                  >
+                    <svg
+                      className="w-4 h-4 sm:w-5 sm:h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Table Footer */}
           {filtered.length > 0 && (

@@ -74,6 +74,14 @@ function Dashboard() {
   const [filterTo, setFilterTo] = useState("");
   const [minAmount, setMinAmount] = useState("");
 
+  // Sort states
+  const [sortBy, setSortBy] = useState("date");
+  const [sortOrder, setSortOrder] = useState("desc");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Invoice detail modal states
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -187,8 +195,7 @@ function Dashboard() {
 
     const salesQ = query(
       collection(db, "Sales"),
-      orderBy("created_at", "desc"),
-      limit(8)
+      orderBy("created_at", "desc")
     );
     const unsubRecent = onSnapshot(salesQ, (snap) => {
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -225,7 +232,8 @@ function Dashboard() {
         !(
           (inv.sale_id || inv.id || "").toLowerCase().includes(searchLower) ||
           (inv.customer?.name || "").toLowerCase().includes(searchLower) ||
-          (inv.customer?.email || "").toLowerCase().includes(searchLower)
+          (inv.customer?.email || "").toLowerCase().includes(searchLower) ||
+          (inv.customer?.phone || "").toLowerCase().includes(searchLower)
         )
       )
         return false;
@@ -251,6 +259,42 @@ function Dashboard() {
 
     return true;
   });
+
+  // Sort invoices
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    let comparison = 0;
+
+    if (sortBy === "date") {
+      const dateA = a.created_at?.toMillis ? a.created_at.toMillis() : 0;
+      const dateB = b.created_at?.toMillis ? b.created_at.toMillis() : 0;
+      comparison = dateA - dateB;
+    } else if (sortBy === "amount") {
+      const amtA = Number(a.total || a.amount || 0);
+      const amtB = Number(b.total || b.amount || 0);
+      comparison = amtA - amtB;
+    } else if (sortBy === "customer") {
+      const nameA = (a.customer?.name || "Walk-in Customer").toLowerCase();
+      const nameB = (b.customer?.name || "Walk-in Customer").toLowerCase();
+      comparison = nameA.localeCompare(nameB);
+    } else if (sortBy === "invoice") {
+      const idA = (a.sale_id || a.id || "").toLowerCase();
+      const idB = (b.sale_id || b.id || "").toLowerCase();
+      comparison = idA.localeCompare(idB);
+    }
+
+    return sortOrder === "asc" ? comparison : -comparison;
+  });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedInvoices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInvoices = sortedInvoices.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterFrom, filterTo, minAmount, sortBy, sortOrder]);
 
   // Handlers for invoice modal
   const handleViewInvoice = (invoice) => {
@@ -560,44 +604,74 @@ function Dashboard() {
 
                 {/* Filter panel (simple) */}
                 {showFilter && (
-                  <div className="mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-gray-600">From</label>
-                      <input
-                        type="date"
-                        value={filterFrom}
-                        onChange={(e) => setFilterFrom(e.target.value)}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                      />
+                  <div className="mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600">From</label>
+                        <input
+                          type="date"
+                          value={filterFrom}
+                          onChange={(e) => setFilterFrom(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">To</label>
+                        <input
+                          type="date"
+                          value={filterTo}
+                          onChange={(e) => setFilterTo(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">
+                          Min Amount (₹)
+                        </label>
+                        <input
+                          type="number"
+                          value={minAmount}
+                          onChange={(e) => setMinAmount(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-600">To</label>
-                      <input
-                        type="date"
-                        value={filterTo}
-                        onChange={(e) => setFilterTo(e.target.value)}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">
-                        Min Amount (₹)
+
+                    {/* Sort Options */}
+                    <div className="border-t border-gray-200 pt-4">
+                      <label className="text-xs text-gray-600 mb-2 block">
+                        Sort By
                       </label>
-                      <input
-                        type="number"
-                        value={minAmount}
-                        onChange={(e) => setMinAmount(e.target.value)}
-                        className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                        placeholder="0"
-                      />
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="date">Date</option>
+                          <option value="amount">Amount</option>
+                          <option value="customer">Customer</option>
+                          <option value="invoice">Invoice ID</option>
+                        </select>
+                        <select
+                          value={sortOrder}
+                          onChange={(e) => setSortOrder(e.target.value)}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="desc">Descending</option>
+                          <option value="asc">Ascending</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="sm:col-span-3 flex gap-2 mt-2">
+
+                    <div className="flex gap-2 mt-2">
                       <button
                         onClick={() => {
                           // apply is implicit through state; just collapse the panel
                           setShowFilter(false);
                         }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-xl"
+                        className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
                       >
                         Apply
                       </button>
@@ -606,10 +680,12 @@ function Dashboard() {
                           setFilterFrom("");
                           setFilterTo("");
                           setMinAmount("");
+                          setSortBy("date");
+                          setSortOrder("desc");
                         }}
-                        className="px-4 py-2 bg-gray-100 rounded-xl"
+                        className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
                       >
-                        Clear
+                        Clear All
                       </button>
                     </div>
                   </div>
@@ -643,8 +719,8 @@ function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredInvoices.length > 0 ? (
-                        filteredInvoices.map((inv) => {
+                      {paginatedInvoices.length > 0 ? (
+                        paginatedInvoices.map((inv) => {
                           const amt = Number(inv.total || inv.amount || 0);
                           const cust = inv.customer || {};
                           const dt = inv.created_at?.toDate
@@ -712,6 +788,107 @@ function Dashboard() {
                   </table>
                 </div>
               </div>
+
+              {/* Pagination Controls */}
+              {sortedInvoices.length > 0 && (
+                <div className="px-6 py-4 border-t border-gray-100">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    {/* Results info */}
+                    <div className="text-sm text-gray-600">
+                      Page{" "}
+                      <span className="font-medium text-gray-900">
+                        {currentPage}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-medium text-gray-900">
+                        {totalPages}
+                      </span>{" "}
+                      • Total{" "}
+                      <span className="font-medium text-gray-900">
+                        {sortedInvoices.length}
+                      </span>{" "}
+                      invoices
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                        title="First page"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(1, prev - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                      >
+                        Previous
+                      </button>
+
+                      <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-blue-50 rounded-xl">
+                        <span className="text-sm font-semibold text-blue-600">
+                          {currentPage}
+                        </span>
+                        <span className="text-sm text-gray-400">/</span>
+                        <span className="text-sm text-gray-600">
+                          {totalPages}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(totalPages, prev + 1)
+                          )
+                        }
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                      >
+                        Next
+                      </button>
+
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                        title="Last page"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
