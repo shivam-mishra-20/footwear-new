@@ -83,6 +83,16 @@ function Sales() {
   const [editingItemId, setEditingItemId] = useState(null);
   const [expandedProducts, setExpandedProducts] = useState(new Set());
 
+  // Filter and Sort states
+  const [showFilters, setShowFilters] = useState(false);
+  const [stockFilter, setStockFilter] = useState("all"); // all, in-stock, low-stock, out-of-stock
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
+  const [sortBy, setSortBy] = useState("name"); // name, price-low, price-high, stock-low, stock-high
+  const [sortOrder, setSortOrder] = useState("asc");
+
   useEffect(() => {
     const q = query(
       collection(db, "ProductsRegistered"),
@@ -95,14 +105,123 @@ function Sales() {
   }, []);
 
   const filtered = useMemo(() => {
+    let result = [...products];
+
+    // Search filter
     const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) =>
-      [p.name, p.barcode, p.category, p.gender]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    );
-  }, [products, search]);
+    if (q) {
+      result = result.filter((p) =>
+        [p.name, p.barcode, p.category, p.gender]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      );
+    }
+
+    // Stock filter
+    if (stockFilter !== "all") {
+      result = result.filter((p) => {
+        const variants = p.variants || {};
+        const hasVariants = Object.keys(variants).length > 0;
+        const totalStock = hasVariants
+          ? Object.values(variants).reduce(
+              (sum, v) => sum + Number(v?.stock || 0),
+              0
+            )
+          : Number(p.stock || 0);
+
+        if (stockFilter === "in-stock") return totalStock > 10;
+        if (stockFilter === "low-stock")
+          return totalStock > 0 && totalStock <= 10;
+        if (stockFilter === "out-of-stock") return totalStock === 0;
+        return true;
+      });
+    }
+
+    // Category filter
+    if (categoryFilter !== "all") {
+      result = result.filter((p) => p.category === categoryFilter);
+    }
+
+    // Gender filter
+    if (genderFilter !== "all") {
+      result = result.filter((p) => p.gender === genderFilter);
+    }
+
+    // Price filter
+    if (priceMin || priceMax) {
+      result = result.filter((p) => {
+        const variants = p.variants || {};
+        const hasVariants = Object.keys(variants).length > 0;
+
+        if (hasVariants) {
+          const prices = Object.values(variants).map((v) =>
+            Number(v?.price || 0)
+          );
+          const minPrice = Math.min(...prices);
+          const maxPrice = Math.max(...prices);
+
+          if (priceMin && maxPrice < Number(priceMin)) return false;
+          if (priceMax && minPrice > Number(priceMax)) return false;
+        } else {
+          const price = Number(p.price || 0);
+          if (priceMin && price < Number(priceMin)) return false;
+          if (priceMax && price > Number(priceMax)) return false;
+        }
+        return true;
+      });
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (sortBy === "name") {
+        return a.name?.localeCompare(b.name || "") || 0;
+      }
+
+      if (sortBy === "price-low" || sortBy === "price-high") {
+        const getAvgPrice = (p) => {
+          const variants = p.variants || {};
+          const hasVariants = Object.keys(variants).length > 0;
+          if (hasVariants) {
+            const prices = Object.values(variants).map((v) =>
+              Number(v?.price || 0)
+            );
+            return prices.reduce((sum, p) => sum + p, 0) / prices.length;
+          }
+          return Number(p.price || 0);
+        };
+        const diff = getAvgPrice(a) - getAvgPrice(b);
+        return sortBy === "price-low" ? diff : -diff;
+      }
+
+      if (sortBy === "stock-low" || sortBy === "stock-high") {
+        const getStock = (p) => {
+          const variants = p.variants || {};
+          const hasVariants = Object.keys(variants).length > 0;
+          return hasVariants
+            ? Object.values(variants).reduce(
+                (sum, v) => sum + Number(v?.stock || 0),
+                0
+              )
+            : Number(p.stock || 0);
+        };
+        const diff = getStock(a) - getStock(b);
+        return sortBy === "stock-low" ? diff : -diff;
+      }
+
+      return 0;
+    });
+
+    return result;
+  }, [
+    products,
+    search,
+    stockFilter,
+    categoryFilter,
+    genderFilter,
+    priceMin,
+    priceMax,
+    sortBy,
+  ]);
 
   const toggleProductExpansion = (productId) => {
     setExpandedProducts((prev) => {
@@ -649,7 +768,7 @@ function Sales() {
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100">
               {/* Search Header */}
               <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-100">
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
                   <div className="relative flex-1">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
@@ -669,6 +788,163 @@ function Sales() {
                     <span className="font-medium">Scan</span>
                   </button>
                 </div>
+
+                {/* Filter and Sort Controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                      showFilters
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                      />
+                    </svg>
+                    Filters
+                  </button>
+
+                  {/* Quick Sort */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                  >
+                    <option value="name">Sort: Name</option>
+                    <option value="price-low">Sort: Price (Low-High)</option>
+                    <option value="price-high">Sort: Price (High-Low)</option>
+                    <option value="stock-low">Sort: Stock (Low-High)</option>
+                    <option value="stock-high">Sort: Stock (High-Low)</option>
+                  </select>
+
+                  {/* Active Filter Count */}
+                  {(stockFilter !== "all" ||
+                    categoryFilter !== "all" ||
+                    genderFilter !== "all" ||
+                    priceMin ||
+                    priceMax) && (
+                    <button
+                      onClick={() => {
+                        setStockFilter("all");
+                        setCategoryFilter("all");
+                        setGenderFilter("all");
+                        setPriceMin("");
+                        setPriceMax("");
+                      }}
+                      className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 font-medium"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+
+                  <span className="text-sm text-gray-600 ml-auto">
+                    {filtered.length} product{filtered.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {/* Expanded Filters */}
+                {showFilters && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Stock Filter */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Stock Availability
+                        </label>
+                        <select
+                          value={stockFilter}
+                          onChange={(e) => setStockFilter(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                        >
+                          <option value="all">All Products</option>
+                          <option value="in-stock">In Stock ({">"}10)</option>
+                          <option value="low-stock">Low Stock (1-10)</option>
+                          <option value="out-of-stock">Out of Stock</option>
+                        </select>
+                      </div>
+
+                      {/* Category Filter */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Category
+                        </label>
+                        <select
+                          value={categoryFilter}
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                        >
+                          <option value="all">All Categories</option>
+                          {Array.from(
+                            new Set(
+                              products.map((p) => p.category).filter(Boolean)
+                            )
+                          ).map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Gender Filter */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Gender
+                        </label>
+                        <select
+                          value={genderFilter}
+                          onChange={(e) => setGenderFilter(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                        >
+                          <option value="all">All Genders</option>
+                          {Array.from(
+                            new Set(
+                              products.map((p) => p.gender).filter(Boolean)
+                            )
+                          ).map((gender) => (
+                            <option key={gender} value={gender}>
+                              {gender}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Price Range */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-2">
+                          Price Range (₹)
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            placeholder="Min"
+                            value={priceMin}
+                            onChange={(e) => setPriceMin(e.target.value)}
+                            className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Max"
+                            value={priceMax}
+                            onChange={(e) => setPriceMax(e.target.value)}
+                            className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Products Table/List */}

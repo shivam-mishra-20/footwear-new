@@ -61,6 +61,7 @@ function Inventory() {
   const [gender, setGender] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("");
   const [stock, setStock] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +76,8 @@ function Inventory() {
   const [invoiceSuccess, setInvoiceSuccess] = useState("");
   const [invoiceProduct, setInvoiceProduct] = useState(null);
   const [expandedProducts, setExpandedProducts] = useState(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   useEffect(() => {
     const q = query(
@@ -126,9 +129,11 @@ function Inventory() {
         const productSnap = await getDoc(productRef);
         if (productSnap.exists()) {
           const variants = productSnap.data().variants || {};
+          const numericCost = Number(purchaseCost || 0);
           variants[size] = {
             stock: numericStock,
             price: numericPrice,
+            purchaseCost: numericCost,
             size: size,
           };
           await updateDoc(productRef, {
@@ -143,11 +148,13 @@ function Inventory() {
       } else if (existing) {
         // Product exists - add/update size variant
         const variants = existing.variants || {};
+        const numericCost = Number(purchaseCost || 0);
         if (variants[size]) {
           // Size exists - add to stock
           variants[size].stock =
             (Number(variants[size].stock) || 0) + numericStock;
           variants[size].price = numericPrice;
+          variants[size].purchaseCost = numericCost;
           setSuccess(
             `Size ${size} restocked! Added ${numericStock} units. New total: ${variants[size].stock}`
           );
@@ -156,6 +163,7 @@ function Inventory() {
           variants[size] = {
             stock: numericStock,
             price: numericPrice,
+            purchaseCost: numericCost,
             size: size,
           };
           setSuccess(`Size ${size} added successfully!`);
@@ -169,6 +177,7 @@ function Inventory() {
         });
       } else {
         // New product with first size variant
+        const numericCost = Number(purchaseCost || 0);
         await setDoc(doc(db, "ProductsRegistered", docId), {
           barcode,
           name,
@@ -179,6 +188,7 @@ function Inventory() {
             [size]: {
               stock: numericStock,
               price: numericPrice,
+              purchaseCost: numericCost,
               size: size,
             },
           },
@@ -193,6 +203,7 @@ function Inventory() {
       setGender("");
       setCategory("");
       setPrice("");
+      setPurchaseCost("");
       setStock("");
       setEditId(null);
       setEditVariantSize(null);
@@ -215,10 +226,12 @@ function Inventory() {
       const variant = product.variants[variantSize];
       setSize(variantSize);
       setPrice(variant.price || "");
+      setPurchaseCost(variant.purchaseCost || "");
       setStock(variant.stock || "");
     } else {
       setSize("");
       setPrice("");
+      setPurchaseCost("");
       setStock("");
     }
     setSuccess("");
@@ -254,12 +267,20 @@ function Inventory() {
         setGender("");
         setCategory("");
         setPrice("");
+        setPurchaseCost("");
         setStock("");
       }
     } catch {
       setError("Failed to delete product.");
     }
     setLoading(false);
+    setShowDeleteModal(false);
+    setProductToDelete(null);
+  };
+
+  const confirmDelete = (product) => {
+    setProductToDelete(product);
+    setShowDeleteModal(true);
   };
 
   const handleMarkAsSold = async (product) => {
@@ -502,10 +523,10 @@ function Inventory() {
                     Pricing & Inventory
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Price (₹)
+                        Selling Price (₹)
                       </label>
                       <input
                         type="number"
@@ -517,6 +538,23 @@ function Inventory() {
                         min="0"
                         step="0.01"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Purchase Cost (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={purchaseCost}
+                        onChange={(e) => setPurchaseCost(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                        min="0"
+                        step="0.01"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        For profit calculation
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -726,7 +764,7 @@ function Inventory() {
                                     <PlusIcon />
                                   </button>
                                   <button
-                                    onClick={() => handleDelete(product.id)}
+                                    onClick={() => confirmDelete(product)}
                                     className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-150"
                                     title="Delete Product"
                                   >
@@ -1181,6 +1219,75 @@ function Inventory() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && productToDelete && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-300">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <DeleteIcon className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Delete Product
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <p className="text-sm text-gray-700 mb-2">
+                  You are about to delete:
+                </p>
+                <p className="font-semibold text-gray-900">
+                  {productToDelete.name}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Barcode: {productToDelete.barcode}
+                </p>
+                {productToDelete.variants && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {Object.keys(productToDelete.variants).length} variant(s)
+                    will be removed
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setProductToDelete(null);
+                  }}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors duration-200"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(productToDelete.id)}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <DeleteIcon />
+                      Delete Product
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

@@ -14,7 +14,11 @@ import Inventory from "./Pages/Inventory";
 import Dashboard from "./Pages/Dashboard";
 import Sales from "./Pages/Sales";
 import Report from "./Pages/Report";
+import ReturnsRefunds from "./Pages/ReturnsRefunds";
+import GiftCardsVouchers from "./Pages/GiftCardsVouchers";
+import Billing from "./Pages/Billing";
 import { AuthProvider } from "./context/AuthContext";
+import { DashboardProvider } from "./context/DashboardContext";
 
 function Logout() {
   return <h1 className="text-3xl font-bold">Logout</h1>;
@@ -34,7 +38,7 @@ function AppLayout({ children }) {
         />
       )}
       {/* Content */}
-      <div className="flex-1 bg-white lg:ml-[240px]">
+      <div className="flex-1 bg-white lg:ml-[260px]">
         {/* Topbar for mobile */}
         <div className="lg:hidden sticky top-0 z-10 bg-white border-b border-gray-200 flex items-center px-2 h-16">
           <button
@@ -100,6 +104,30 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/returns"
+          element={
+            <ProtectedRoute>
+              <ReturnsRefunds />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gift-cards"
+          element={
+            <ProtectedRoute>
+              <GiftCardsVouchers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute>
+              <Billing />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/logout" element={<Logout />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
@@ -110,9 +138,11 @@ function App() {
 function RootApp() {
   return (
     <AuthProvider>
-      <Router>
-        <App />
-      </Router>
+      <DashboardProvider>
+        <Router>
+          <App />
+        </Router>
+      </DashboardProvider>
     </AuthProvider>
   );
 }

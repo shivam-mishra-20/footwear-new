@@ -3,7 +3,16 @@ import { NavLink, useNavigate } from "react-router";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
 // Updated to more business-appropriate icon set (Lucide/Feather style via react-icons)
-import { FiHome, FiBarChart2, FiLogOut } from "react-icons/fi";
+import {
+  FiHome,
+  FiBarChart2,
+  FiLogOut,
+  FiRefreshCw,
+  FiGift,
+  FiTag,
+  FiTrendingUp,
+  FiDollarSign,
+} from "react-icons/fi";
 import { LuPackage, LuShoppingCart } from "react-icons/lu";
 import { useAuth } from "../context/AuthContext";
 
@@ -20,43 +29,95 @@ function Sidebar({ open, setOpen }) {
   const translated = open ? "translate-x-0" : "-translate-x-full";
   return (
     <div
-      className={`bg-white h-screen pt-6 shadow-xl w-[240px] lg:translate-x-0 fixed z-40 top-0 left-0 ${translated} transition-transform border-r border-gray-100 overflow-hidden`}
+      className={`bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 h-screen pt-6 shadow-2xl w-[260px] lg:translate-x-0 fixed z-40 top-0 left-0 ${translated} transition-transform overflow-y-auto flex flex-col`}
     >
       {/* Brand */}
-      <div className="px-5 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-1">
-            <img
-              src="/noble_footwear_logo.png"
-              alt="Logo"
-              className="w-36 h-36 object-contain"
-            />
-          </div>
+      <div className="px-5 mb-8">
+        <div className="flex items-center justify-center mb-4">
+          <img
+            src="/noble_footwear_logo.png"
+            alt="Logo"
+            className="w-32 h-32 object-contain"
+          />
         </div>
         {user && (
-          <div className="mt-3 text-xs text-gray-500 truncate">
-            {user.email}
+          <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-3 border border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
+                {user.email?.[0]?.toUpperCase() || "U"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 mb-0.5">Logged in as</p>
+                <p className="text-sm font-semibold text-white truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="px-3 flex flex-col gap-1">
+      <nav className="px-3 flex flex-col gap-2 flex-1">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-4 mb-2">
+          Main Menu
+        </p>
         {[
-          { to: "/", label: "Dashboard", icon: FiHome, end: true },
-          { to: "/inventory", label: "Inventory", icon: LuPackage },
-          { to: "/sales", label: "Point of Sale", icon: LuShoppingCart },
-          { to: "/report", label: "Reports", icon: FiBarChart2 },
+          {
+            to: "/",
+            label: "Dashboard",
+            icon: FiHome,
+            end: true,
+            gradient: "from-blue-500 to-cyan-500",
+          },
+          {
+            to: "/inventory",
+            label: "Inventory",
+            icon: LuPackage,
+            gradient: "from-green-500 to-emerald-500",
+          },
+          {
+            to: "/sales",
+            label: "Point of Sale",
+            icon: LuShoppingCart,
+            gradient: "from-purple-500 to-pink-500",
+          },
+          {
+            to: "/report",
+            label: "Reports",
+            icon: FiBarChart2,
+            gradient: "from-orange-500 to-amber-500",
+          },
+          {
+            to: "/billing",
+            label: "Billing & Accounting",
+            icon: FiDollarSign,
+            gradient: "from-indigo-500 to-blue-500",
+          },
+          {
+            to: "/returns",
+            label: "Returns & Refunds",
+            icon: FiRefreshCw,
+            gradient: "from-red-500 to-rose-500",
+          },
+          {
+            to: "/gift-cards",
+            label: "Gift Cards",
+            icon: FiGift,
+            gradient: "from-teal-500 to-cyan-500",
+          },
         ].map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `group relative flex items-center gap-3 px-4 py-2.5 rounded-xl no-underline text-sm font-medium transition-all ${
+              `group relative flex items-center gap-3 px-4 py-3 rounded-xl no-underline text-sm font-semibold transition-all duration-200 ${
                 isActive
-                  ? "text-blue-700 bg-blue-50"
-                  : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                  ? "bg-gradient-to-r " +
+                    item.gradient +
+                    " text-white shadow-lg"
+                  : "text-gray-300 hover:text-white hover:bg-gray-800/50"
               }`
             }
             onClick={() => setOpen(false)}
@@ -64,38 +125,43 @@ function Sidebar({ open, setOpen }) {
             {({ isActive }) => (
               <>
                 <span
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-r-full transition ${
+                  className={`inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 ${
                     isActive
-                      ? "bg-blue-600 opacity-100"
-                      : "opacity-0 group-hover:opacity-60 bg-gray-300"
-                  }`}
-                />
-                <span
-                  className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${
-                    isActive
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-600 group-hover:text-gray-900"
+                      ? "bg-white/20 scale-105"
+                      : "bg-gray-800 group-hover:bg-gray-700 group-hover:scale-105"
                   }`}
                 >
-                  {item.icon && <item.icon className="w-4 h-4" />}
+                  {item.icon && <item.icon className="w-5 h-5" />}
                 </span>
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {isActive && (
+                  <span className="w-2 h-2 rounded-full bg-white shadow-lg"></span>
+                )}
               </>
             )}
           </NavLink>
         ))}
 
         {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className="mt-4 mx-3 inline-flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition"
-        >
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 text-red-600">
-            <FiLogOut className="w-4 h-4" />
-          </span>
-          Logout
-        </button>
+        <div className="mt-6 pt-4 border-t border-gray-700">
+          <button
+            onClick={handleLogout}
+            className="w-full group relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-500 transition-all duration-200 hover:shadow-lg"
+          >
+            <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-red-500/10 group-hover:bg-white/20 transition-all duration-200 group-hover:scale-105">
+              <FiLogOut className="w-5 h-5" />
+            </span>
+            <span className="flex-1 text-left">Logout</span>
+          </button>
+        </div>
       </nav>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-700 mt-auto">
+        <p className="text-xs text-gray-500 text-center">
+          © 2026 Noble Footwear
+        </p>
+      </div>
     </div>
   );
 }

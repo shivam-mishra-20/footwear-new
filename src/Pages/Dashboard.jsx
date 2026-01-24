@@ -1,12 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { db } from "../../firebaseConfig";
-import {
-  collection,
-  onSnapshot,
-  query,
-  orderBy,
-  limit,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import {
   ResponsiveContainer,
   LineChart,
@@ -25,6 +19,7 @@ import {
   BiFilter,
   BiDownload,
   BiFile,
+  BiError,
 } from "react-icons/bi";
 
 // External modals
@@ -32,6 +27,10 @@ import StockModal from "../modals/StockModal";
 import OrdersModal from "../modals/OrdersModal";
 import RevenueModal from "../modals/RevenueModal";
 import ProductsModal from "../modals/ProductsModal";
+import LowStockModal from "../modals/LowStockModal";
+import CustomizeDashboard from "./CustomizeDashboard";
+import { useDashboard } from "../context/DashboardContext";
+import { FiSettings } from "react-icons/fi";
 
 // Icon Components (now use react-icons and accept className)
 const BoxIcon = ({ className = "text-current w-8 h-8" }) => (
@@ -60,6 +59,8 @@ const InvoiceIcon = ({ className = "w-4 h-4" }) => (
 );
 
 function Dashboard() {
+  const { isCustomizing, setIsCustomizing, getAllWidgets } = useDashboard();
+  const allWidgets = getAllWidgets();
   const [totalStock, setTotalStock] = useState(0);
   const [revenue, setRevenue] = useState(0);
   const [orders, setOrders] = useState(0);
@@ -67,6 +68,11 @@ function Dashboard() {
   const [recentInvoices, setRecentInvoices] = useState([]);
   const [dailyRevenueData, setDailyRevenueData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Data for custom widgets
+  const [salesData, setSalesData] = useState([]);
+  const [productsData, setProductsData] = useState([]);
+  const [returnsData, setReturnsData] = useState([]);
 
   // New filter states
   const [showFilter, setShowFilter] = useState(false);
@@ -91,9 +97,12 @@ function Dashboard() {
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [showProductsModal, setShowProductsModal] = useState(false);
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
 
   // Counts for stat cards
   const [soldProductsCount, setSoldProductsCount] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [lowStockAlertDismissed, setLowStockAlertDismissed] = useState(false);
 
   const parseStockValue = useCallback((value) => {
     if (value == null) return 0;
@@ -108,7 +117,13 @@ function Dashboard() {
       return value.reduce((s, item) => s + parseStockValue(item), 0);
     }
     if (typeof value === "object") {
-      return Object.values(value).reduce((s, v) => s + parseStockValue(v), 0);
+      // For objects (like variants), only sum the 'stock' field of each variant
+      return Object.values(value).reduce((s, v) => {
+        if (v && typeof v === "object" && "stock" in v) {
+          return s + parseStockValue(v.stock);
+        }
+        return s;
+      }, 0);
     }
     return 0;
   }, []);
@@ -118,6 +133,7 @@ function Dashboard() {
       collection(db, "ProductsRegistered"),
       (snapshot) => {
         let sum = 0;
+        let lowCount = 0;
         snapshot.forEach((doc) => {
           const data = doc.data() || {};
 
@@ -147,8 +163,14 @@ function Dashboard() {
           }
 
           sum += stockVal || 0;
+
+          // Count low stock items (threshold: 10)
+          if (stockVal <= 10) {
+            lowCount++;
+          }
         });
         setTotalStock(sum);
+        setLowStockCount(lowCount);
       }
     );
     return () => unsub();
@@ -200,7 +222,22 @@ function Dashboard() {
     const unsubRecent = onSnapshot(salesQ, (snap) => {
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setRecentInvoices(arr);
+      setSalesData(arr); // Store for custom widgets
     });
+
+    const unsubProducts = onSnapshot(
+      collection(db, "ProductsRegistered"),
+      (snap) => {
+        const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setProductsData(arr); // Store for custom widgets
+      }
+    );
+
+    const unsubReturns = onSnapshot(collection(db, "Returns"), (snap) => {
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setReturnsData(arr); // Store for custom widgets
+    });
+
     const unsubSold = onSnapshot(collection(db, "SoldProducts"), (snap) => {
       const arr = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
@@ -212,6 +249,8 @@ function Dashboard() {
       unsubSales();
       unsubSold();
       unsubRecent();
+      unsubProducts();
+      unsubReturns();
     };
   }, []);
 
@@ -221,6 +260,82 @@ function Dashboard() {
     if (inv.created_at?.toDate) return inv.created_at.toDate();
     const d = new Date(inv.created_at || inv.date || Date.now());
     return isNaN(d.getTime()) ? null : d;
+  };
+
+  // Calculate custom widget value
+  const calculateWidgetValue = (widget) => {
+    if (!widget || !widget.dataSource || !widget.calculation) {
+      return { value: "N/A", formatted: "N/A" };
+    }
+
+    let data = [];
+    const source = widget.dataSource.toLowerCase();
+
+    if (source.includes("sales")) {
+      data = salesData;
+    } else if (source.includes("products") || source.includes("inventory")) {
+      data = productsData;
+    } else if (source.includes("returns") || source.includes("refunds")) {
+      data = returnsData;
+    }
+
+    const calc = widget.calculation.toLowerCase();
+
+    if (calc === "count") {
+      return { value: data.length, formatted: data.length.toString() };
+    }
+
+    if (calc === "sum") {
+      let sum = 0;
+      data.forEach((item) => {
+        // Try different fields that might contain amounts
+        const amount = Number(
+          item.total || item.amount || item.price || item.refundAmount || 0
+        );
+        sum += amount;
+      });
+      return { value: sum, formatted: `₹${sum.toLocaleString("en-IN")}` };
+    }
+
+    if (calc === "average" || calc === "avg") {
+      if (data.length === 0) return { value: 0, formatted: "₹0" };
+      let sum = 0;
+      data.forEach((item) => {
+        const amount = Number(
+          item.total || item.amount || item.price || item.refundAmount || 0
+        );
+        sum += amount;
+      });
+      const avg = sum / data.length;
+      return { value: avg, formatted: `₹${avg.toLocaleString("en-IN")}` };
+    }
+
+    if (calc === "max") {
+      if (data.length === 0) return { value: 0, formatted: "₹0" };
+      let max = 0;
+      data.forEach((item) => {
+        const amount = Number(
+          item.total || item.amount || item.price || item.refundAmount || 0
+        );
+        if (amount > max) max = amount;
+      });
+      return { value: max, formatted: `₹${max.toLocaleString("en-IN")}` };
+    }
+
+    if (calc === "min") {
+      if (data.length === 0) return { value: 0, formatted: "₹0" };
+      let min = Infinity;
+      data.forEach((item) => {
+        const amount = Number(
+          item.total || item.amount || item.price || item.refundAmount || 0
+        );
+        if (amount < min) min = amount;
+      });
+      min = min === Infinity ? 0 : min;
+      return { value: min, formatted: `₹${min.toLocaleString("en-IN")}` };
+    }
+
+    return { value: "N/A", formatted: "N/A" };
   };
 
   // Filter recent invoices based on search + filter inputs
@@ -508,633 +623,792 @@ function Dashboard() {
                 Here's what's happening with your business today.
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsCustomizing(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-lg hover:shadow-xl"
+              >
+                <FiSettings className="w-5 h-5" />
+                <span className="hidden sm:inline">Customize Dashboard</span>
+                <span className="sm:hidden">Customize</span>
+              </button>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">
+                  {new Date().toLocaleDateString("en-US", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            title="Total Stock"
-            value={totalStock}
-            icon={BoxIcon}
-            bgColor="bg-white"
-            textColor="text-blue-600"
-            trend={true}
-            onClick={() => setShowStockModal(true)}
-          />
-          <StatCard
-            title="Total Orders"
-            value={orders}
-            icon={ShoppingBagIcon}
-            bgColor="bg-white"
-            textColor="text-green-600"
-            trend={true}
-            onClick={() => setShowOrdersModal(true)}
-          />
-          <StatCard
-            title="Total Revenue"
-            value={revenue}
-            icon={CurrencyIcon}
-            bgColor="bg-white"
-            textColor="text-purple-600"
-            trend={true}
-            onClick={() => setShowRevenueModal(true)}
-          />
-          <StatCard
-            title="Products"
-            value={soldProductsCount}
-            icon={PackageIcon}
-            bgColor="bg-white"
-            textColor="text-orange-600"
-            trend={false}
-            onClick={() => setShowProductsModal(true)}
-          />
+          {allWidgets
+            .filter((w) => w.enabled && w.type === "stat")
+            .sort((a, b) => a.order - b.order)
+            .map((widget) => {
+              // Map widget IDs to their data
+              const widgetData = {
+                stock: {
+                  value: totalStock,
+                  icon: BoxIcon,
+                  textColor: "text-blue-600",
+                  onClick: () => setShowStockModal(true),
+                },
+                orders: {
+                  value: orders,
+                  icon: ShoppingBagIcon,
+                  textColor: "text-green-600",
+                  onClick: () => setShowOrdersModal(true),
+                },
+                revenue: {
+                  value: revenue,
+                  icon: CurrencyIcon,
+                  textColor: "text-purple-600",
+                  onClick: () => setShowRevenueModal(true),
+                },
+                products: {
+                  value: soldProductsCount,
+                  icon: PackageIcon,
+                  textColor: "text-orange-600",
+                  onClick: () => setShowProductsModal(true),
+                },
+              };
+
+              const data = widgetData[widget.id] || {
+                value: 0,
+                icon: BoxIcon,
+                textColor: "text-gray-600",
+              };
+
+              return (
+                <StatCard
+                  key={widget.id}
+                  title={widget.title}
+                  value={data.value}
+                  icon={data.icon}
+                  bgColor="bg-white"
+                  textColor={data.textColor}
+                  trend={widget.id !== "products"}
+                  onClick={data.onClick}
+                />
+              );
+            })}
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-          {/* Recent Invoices */}
-          <div className="xl:col-span-8">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-              {/* Header */}
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                      Recent Invoices
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {filteredInvoices.length} of {recentInvoices.length}{" "}
-                      invoices shown
+        {/* Custom Widgets Section */}
+        {allWidgets.filter((w) => w.enabled && w.type === "custom").length >
+          0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {allWidgets
+              .filter((w) => w.enabled && w.type === "custom")
+              .sort((a, b) => a.order - b.order)
+              .map((widget) => {
+                const result = calculateWidgetValue(widget);
+                return (
+                  <div
+                    key={widget.id}
+                    className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                          {widget.title || "Custom Widget"}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {widget.dataSource || "No data source"}
+                        </p>
+                      </div>
+                      <span className="text-2xl">✨</span>
+                    </div>
+                    <div className="text-center py-4">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                        {result.formatted}
+                      </div>
+                      <p className="text-sm text-gray-600 capitalize">
+                        {widget.calculation || "calculation"}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-400 mt-4 pt-4 border-t border-gray-100">
+                      <span>Custom Widget</span>
+                      <span className="capitalize">
+                        {widget.widgetType || "stat"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {/* Low Stock Alert Banner */}
+        {lowStockCount > 0 && !lowStockAlertDismissed && (
+          <div className="mb-6">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="p-2 bg-orange-100 rounded-lg mt-0.5">
+                    <BiError className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-semibold text-orange-900">
+                        Low Stock Alert
+                      </p>
+                      <span className="px-2 py-0.5 bg-orange-200 text-orange-800 text-xs font-medium rounded-full">
+                        {lowStockCount}
+                      </span>
+                    </div>
+                    <p className="text-sm text-orange-700">
+                      {lowStockCount} product{lowStockCount !== 1 ? "s" : ""}{" "}
+                      running low on inventory.
+                      <button
+                        onClick={() => setShowLowStockModal(true)}
+                        className="ml-1 text-orange-800 font-medium hover:underline"
+                      >
+                        View details
+                      </button>
                     </p>
                   </div>
-                  <div className="flex gap-3 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:flex-initial">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <SearchIcon />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Search invoices..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm w-full sm:w-64"
-                      />
-                    </div>
-                    {/* Toggle filter button (now functional) */}
-                    <button
-                      onClick={() => setShowFilter((s) => !s)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-150"
-                    >
-                      <FilterIcon />
-                      Filter
-                    </button>
-                  </div>
                 </div>
-
-                {/* Filter panel (simple) */}
-                {showFilter && (
-                  <div className="mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-600">From</label>
-                        <input
-                          type="date"
-                          value={filterFrom}
-                          onChange={(e) => setFilterFrom(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600">To</label>
-                        <input
-                          type="date"
-                          value={filterTo}
-                          onChange={(e) => setFilterTo(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600">
-                          Min Amount (₹)
-                        </label>
-                        <input
-                          type="number"
-                          value={minAmount}
-                          onChange={(e) => setMinAmount(e.target.value)}
-                          className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Sort Options */}
-                    <div className="border-t border-gray-200 pt-4">
-                      <label className="text-xs text-gray-600 mb-2 block">
-                        Sort By
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
-                          className="px-3 py-2 border rounded-lg text-sm"
-                        >
-                          <option value="date">Date</option>
-                          <option value="amount">Amount</option>
-                          <option value="customer">Customer</option>
-                          <option value="invoice">Invoice ID</option>
-                        </select>
-                        <select
-                          value={sortOrder}
-                          onChange={(e) => setSortOrder(e.target.value)}
-                          className="px-3 py-2 border rounded-lg text-sm"
-                        >
-                          <option value="desc">Descending</option>
-                          <option value="asc">Ascending</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => {
-                          // apply is implicit through state; just collapse the panel
-                          setShowFilter(false);
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
-                      >
-                        Apply
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFilterFrom("");
-                          setFilterTo("");
-                          setMinAmount("");
-                          setSortBy("date");
-                          setSortOrder("desc");
-                        }}
-                        className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setLowStockAlertDismissed(true)}
+                  className="p-1 hover:bg-orange-100 rounded-lg transition-colors text-orange-600 hover:text-orange-900"
+                  aria-label="Dismiss alert"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
               </div>
+            </div>
+          </div>
+        )}
 
-              {/* Table */}
-              <div className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Invoice ID
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Customer
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Contact
-                        </th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Amount
-                        </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {paginatedInvoices.length > 0 ? (
-                        paginatedInvoices.map((inv) => {
-                          const amt = Number(inv.total || inv.amount || 0);
-                          const cust = inv.customer || {};
-                          const dt = inv.created_at?.toDate
-                            ? inv.created_at.toDate().toLocaleDateString()
-                            : inv.created_at || "-";
-                          return (
-                            <tr
-                              key={inv.id}
-                              className="hover:bg-gray-50 transition-colors duration-150"
+        {/* Main Content Grid */}
+        {(allWidgets.find((w) => w.id === "recentInvoices" && w.enabled) ||
+          allWidgets.find((w) => w.id === "revenueChart" && w.enabled) ||
+          allWidgets.find((w) => w.id === "topProducts" && w.enabled)) && (
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            {/* Recent Invoices */}
+            {allWidgets.find((w) => w.id === "recentInvoices" && w.enabled) && (
+              <div
+                className={
+                  allWidgets.find(
+                    (w) =>
+                      (w.id === "revenueChart" || w.id === "topProducts") &&
+                      w.enabled
+                  )
+                    ? "xl:col-span-8"
+                    : "xl:col-span-12"
+                }
+              >
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+                  {/* Header */}
+                  <div className="p-6 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                          Recent Invoices
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {filteredInvoices.length} of {recentInvoices.length}{" "}
+                          invoices shown
+                        </p>
+                      </div>
+                      <div className="flex gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <SearchIcon />
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="Search invoices..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm w-full sm:w-64"
+                          />
+                        </div>
+                        {/* Toggle filter button (now functional) */}
+                        <button
+                          onClick={() => setShowFilter((s) => !s)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-150"
+                        >
+                          <FilterIcon />
+                          Filter
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter panel (simple) */}
+                    {showFilter && (
+                      <div className="mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-xs text-gray-600">
+                              From
+                            </label>
+                            <input
+                              type="date"
+                              value={filterFrom}
+                              onChange={(e) => setFilterFrom(e.target.value)}
+                              className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">To</label>
+                            <input
+                              type="date"
+                              value={filterTo}
+                              onChange={(e) => setFilterTo(e.target.value)}
+                              className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600">
+                              Min Amount (₹)
+                            </label>
+                            <input
+                              type="number"
+                              value={minAmount}
+                              onChange={(e) => setMinAmount(e.target.value)}
+                              className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Sort Options */}
+                        <div className="border-t border-gray-200 pt-4">
+                          <label className="text-xs text-gray-600 mb-2 block">
+                            Sort By
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <select
+                              value={sortBy}
+                              onChange={(e) => setSortBy(e.target.value)}
+                              className="px-3 py-2 border rounded-lg text-sm"
                             >
-                              <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {inv.sale_id || inv.id}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {cust.name || "Walk-in Customer"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-600">
-                                  {cust.phone || cust.email || "-"}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                <div className="text-sm font-semibold text-gray-900">
-                                  ₹{amt.toLocaleString("en-IN")}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-600">
-                                  {dt}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <button
-                                  onClick={() => handleViewInvoice(inv)}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-150"
+                              <option value="date">Date</option>
+                              <option value="amount">Amount</option>
+                              <option value="customer">Customer</option>
+                              <option value="invoice">Invoice ID</option>
+                            </select>
+                            <select
+                              value={sortOrder}
+                              onChange={(e) => setSortOrder(e.target.value)}
+                              className="px-3 py-2 border rounded-lg text-sm"
+                            >
+                              <option value="desc">Descending</option>
+                              <option value="asc">Ascending</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => {
+                              // apply is implicit through state; just collapse the panel
+                              setShowFilter(false);
+                            }}
+                            className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+                          >
+                            Apply
+                          </button>
+                          <button
+                            onClick={() => {
+                              setFilterFrom("");
+                              setFilterTo("");
+                              setMinAmount("");
+                              setSortBy("date");
+                              setSortOrder("desc");
+                            }}
+                            className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Table */}
+                  <div className="overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Invoice ID
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Customer
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Contact
+                            </th>
+                            <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Amount
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Date
+                            </th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {paginatedInvoices.length > 0 ? (
+                            paginatedInvoices.map((inv) => {
+                              const amt = Number(inv.total || inv.amount || 0);
+                              const cust = inv.customer || {};
+                              const dt = inv.created_at?.toDate
+                                ? inv.created_at.toDate().toLocaleDateString()
+                                : inv.created_at || "-";
+                              return (
+                                <tr
+                                  key={inv.id}
+                                  className="hover:bg-gray-50 transition-colors duration-150"
                                 >
-                                  <InvoiceIcon />
-                                  View
-                                </button>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {inv.sale_id || inv.id}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {cust.name || "Walk-in Customer"}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm text-gray-600">
+                                      {cust.phone || cust.email || "-"}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <div className="text-sm font-semibold text-gray-900">
+                                      ₹{amt.toLocaleString("en-IN")}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm text-gray-600">
+                                      {dt}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <button
+                                      onClick={() => handleViewInvoice(inv)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-150"
+                                    >
+                                      <InvoiceIcon />
+                                      View
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan="6"
+                                className="px-6 py-12 text-center"
+                              >
+                                <div className="flex flex-col items-center justify-center">
+                                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                    <SearchIcon />
+                                  </div>
+                                  <p className="text-gray-500 text-sm">
+                                    {searchTerm
+                                      ? "No invoices match your search"
+                                      : "No invoices found"}
+                                  </p>
+                                </div>
                               </td>
                             </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan="6" className="px-6 py-12 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                <SearchIcon />
-                              </div>
-                              <p className="text-gray-500 text-sm">
-                                {searchTerm
-                                  ? "No invoices match your search"
-                                  : "No invoices found"}
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {sortedInvoices.length > 0 && (
+                    <div className="px-6 py-4 border-t border-gray-100">
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        {/* Results info */}
+                        <div className="text-sm text-gray-600">
+                          Page{" "}
+                          <span className="font-medium text-gray-900">
+                            {currentPage}
+                          </span>{" "}
+                          of{" "}
+                          <span className="font-medium text-gray-900">
+                            {totalPages}
+                          </span>{" "}
+                          • Total{" "}
+                          <span className="font-medium text-gray-900">
+                            {sortedInvoices.length}
+                          </span>{" "}
+                          invoices
+                        </div>
+
+                        {/* Navigation */}
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                            title="First page"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                              />
+                            </svg>
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              setCurrentPage((prev) => Math.max(1, prev - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                          >
+                            Previous
+                          </button>
+
+                          <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-blue-50 rounded-xl">
+                            <span className="text-sm font-semibold text-blue-600">
+                              {currentPage}
+                            </span>
+                            <span className="text-sm text-gray-400">/</span>
+                            <span className="text-sm text-gray-600">
+                              {totalPages}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() =>
+                              setCurrentPage((prev) =>
+                                Math.min(totalPages, prev + 1)
+                              )
+                            }
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
+                          >
+                            Next
+                          </button>
+
+                          <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                            title="Last page"
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      {/* Footer Filter button kept for parity (open header filter) */}
+                      <button
+                        onClick={() => setShowFilter((s) => !s)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-150"
+                      >
+                        <FilterIcon />
+                        Filter
+                      </button>
+                    </div>
+                    <div>
+                      <button
+                        onClick={exportInvoicesCsv}
+                        className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors duration-150 shadow-lg hover:shadow-xl"
+                      >
+                        <ExportIcon />
+                        Export
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Pagination Controls */}
-              {sortedInvoices.length > 0 && (
-                <div className="px-6 py-4 border-t border-gray-100">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {/* Results info */}
-                    <div className="text-sm text-gray-600">
-                      Page{" "}
-                      <span className="font-medium text-gray-900">
-                        {currentPage}
-                      </span>{" "}
-                      of{" "}
-                      <span className="font-medium text-gray-900">
-                        {totalPages}
-                      </span>{" "}
-                      • Total{" "}
-                      <span className="font-medium text-gray-900">
-                        {sortedInvoices.length}
-                      </span>{" "}
-                      invoices
+            {/* Right Sidebar */}
+            <div className="xl:col-span-4 space-y-6">
+              {/* Revenue Chart */}
+              {allWidgets.find((w) => w.id === "revenueChart" && w.enabled) && (
+                <div className="bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                  <div className="p-6 pb-2">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                          Revenue Trend
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Last 30 days performance
+                        </p>
+                      </div>
+                      <select className="text-sm border-2 border-gray-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium text-gray-700">
+                        <option>Last 30 Days</option>
+                        <option>Last 90 Days</option>
+                        <option>Last Year</option>
+                      </select>
                     </div>
 
-                    {/* Navigation */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setCurrentPage(1)}
-                        disabled={currentPage === 1}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-                        title="First page"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                          />
-                        </svg>
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          setCurrentPage((prev) => Math.max(1, prev - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
-                      >
-                        Previous
-                      </button>
-
-                      <div className="hidden sm:flex items-center gap-1 px-3 py-2 bg-blue-50 rounded-xl">
-                        <span className="text-sm font-semibold text-blue-600">
-                          {currentPage}
-                        </span>
-                        <span className="text-sm text-gray-400">/</span>
-                        <span className="text-sm text-gray-600">
-                          {totalPages}
+                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-5 mb-6 border border-blue-100">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                        ₹{Number(revenue).toLocaleString("en-IN")}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 bg-green-100 px-3 py-1 rounded-full">
+                          <svg
+                            className="w-4 h-4 text-green-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                            />
+                          </svg>
+                          <span className="text-green-700 font-bold text-sm">
+                            +8.2%
+                          </span>
+                        </div>
+                        <span className="text-gray-600 text-sm font-medium">
+                          from last month
                         </span>
                       </div>
-
-                      <button
-                        onClick={() =>
-                          setCurrentPage((prev) =>
-                            Math.min(totalPages, prev + 1)
-                          )
-                        }
-                        disabled={currentPage === totalPages}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150 shadow-sm"
-                      >
-                        Next
-                      </button>
-
-                      <button
-                        onClick={() => setCurrentPage(totalPages)}
-                        disabled={currentPage === totalPages}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-                        title="Last page"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                          />
-                        </svg>
-                      </button>
                     </div>
+                  </div>
+
+                  <div className="h-64 w-full px-2 pb-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={dailyRevenueData}
+                        margin={{ top: 10, right: 10, left: -10, bottom: 5 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="colorRevenue"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#3b82f6"
+                              stopOpacity={0.3}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#3b82f6"
+                              stopOpacity={0}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="lineGradient"
+                            x1="0"
+                            y1="0"
+                            x2="1"
+                            y2="0"
+                          >
+                            <stop offset="0%" stopColor="#3b82f6" />
+                            <stop offset="50%" stopColor="#8b5cf6" />
+                            <stop offset="100%" stopColor="#6366f1" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#e5e7eb"
+                          vertical={false}
+                          opacity={0.5}
+                        />
+                        <XAxis
+                          dataKey="label"
+                          tick={{
+                            fontSize: 11,
+                            fill: "#6b7280",
+                            fontWeight: 500,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          dy={10}
+                        />
+                        <YAxis
+                          tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                          tick={{
+                            fontSize: 11,
+                            fill: "#6b7280",
+                            fontWeight: 500,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={45}
+                        />
+                        <Tooltip
+                          formatter={(v) => [
+                            `₹${Number(v).toLocaleString("en-IN")}`,
+                            "Revenue",
+                          ]}
+                          labelStyle={{
+                            color: "#111827",
+                            fontWeight: 600,
+                            marginBottom: "4px",
+                          }}
+                          contentStyle={{
+                            backgroundColor: "#ffffff",
+                            border: "2px solid #e5e7eb",
+                            borderRadius: "12px",
+                            boxShadow:
+                              "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                            padding: "12px",
+                          }}
+                          itemStyle={{
+                            color: "#3b82f6",
+                            fontWeight: 600,
+                          }}
+                          cursor={{
+                            stroke: "#3b82f6",
+                            strokeWidth: 1,
+                            strokeDasharray: "5 5",
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="url(#lineGradient)"
+                          strokeWidth={3}
+                          dot={{
+                            r: 5,
+                            fill: "#ffffff",
+                            strokeWidth: 3,
+                            stroke: "#3b82f6",
+                          }}
+                          activeDot={{
+                            r: 7,
+                            fill: "#3b82f6",
+                            stroke: "#ffffff",
+                            strokeWidth: 3,
+                            filter:
+                              "drop-shadow(0 4px 6px rgba(59, 130, 246, 0.4))",
+                          }}
+                          fill="url(#colorRevenue)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               )}
 
-              {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-                <div>
-                  {/* Footer Filter button kept for parity (open header filter) */}
-                  <button
-                    onClick={() => setShowFilter((s) => !s)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-150"
-                  >
-                    <FilterIcon />
-                    Filter
-                  </button>
-                </div>
-                <div>
-                  <button
-                    onClick={exportInvoicesCsv}
-                    className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors duration-150 shadow-lg hover:shadow-xl"
-                  >
-                    <ExportIcon />
-                    Export
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Sidebar */}
-          <div className="xl:col-span-4 space-y-6">
-            {/* Revenue Chart */}
-            <div className="bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="p-6 pb-2">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                      Revenue Trend
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Last 30 days performance
-                    </p>
-                  </div>
-                  <select className="text-sm border-2 border-gray-200 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium text-gray-700">
-                    <option>Last 30 Days</option>
-                    <option>Last 90 Days</option>
-                    <option>Last Year</option>
-                  </select>
-                </div>
-
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-5 mb-6 border border-blue-100">
-                  <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                    ₹{Number(revenue).toLocaleString("en-IN")}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 bg-green-100 px-3 py-1 rounded-full">
-                      <svg
-                        className="w-4 h-4 text-green-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                        />
-                      </svg>
-                      <span className="text-green-700 font-bold text-sm">
-                        +8.2%
-                      </span>
+              {/* Top Products */}
+              {allWidgets.find((w) => w.id === "topProducts" && w.enabled) && (
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        Top Products
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Best performing items
+                      </p>
                     </div>
-                    <span className="text-gray-600 text-sm font-medium">
-                      from last month
-                    </span>
+                    <div className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                      {topProducts.length} items
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="h-64 w-full px-2 pb-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={dailyRevenueData}
-                    margin={{ top: 10, right: 10, left: -10, bottom: 5 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="colorRevenue"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#3b82f6"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="lineGradient"
-                        x1="0"
-                        y1="0"
-                        x2="1"
-                        y2="0"
-                      >
-                        <stop offset="0%" stopColor="#3b82f6" />
-                        <stop offset="50%" stopColor="#8b5cf6" />
-                        <stop offset="100%" stopColor="#6366f1" />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#e5e7eb"
-                      vertical={false}
-                      opacity={0.5}
-                    />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={10}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                      tick={{ fontSize: 11, fill: "#6b7280", fontWeight: 500 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={45}
-                    />
-                    <Tooltip
-                      formatter={(v) => [
-                        `₹${Number(v).toLocaleString("en-IN")}`,
-                        "Revenue",
-                      ]}
-                      labelStyle={{
-                        color: "#111827",
-                        fontWeight: 600,
-                        marginBottom: "4px",
-                      }}
-                      contentStyle={{
-                        backgroundColor: "#ffffff",
-                        border: "2px solid #e5e7eb",
-                        borderRadius: "12px",
-                        boxShadow:
-                          "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                        padding: "12px",
-                      }}
-                      itemStyle={{
-                        color: "#3b82f6",
-                        fontWeight: 600,
-                      }}
-                      cursor={{
-                        stroke: "#3b82f6",
-                        strokeWidth: 1,
-                        strokeDasharray: "5 5",
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="url(#lineGradient)"
-                      strokeWidth={3}
-                      dot={{
-                        r: 5,
-                        fill: "#ffffff",
-                        strokeWidth: 3,
-                        stroke: "#3b82f6",
-                      }}
-                      activeDot={{
-                        r: 7,
-                        fill: "#3b82f6",
-                        stroke: "#ffffff",
-                        strokeWidth: 3,
-                        filter:
-                          "drop-shadow(0 4px 6px rgba(59, 130, 246, 0.4))",
-                      }}
-                      fill="url(#colorRevenue)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Top Products */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    Top Products
-                  </h3>
-                  <p className="text-sm text-gray-600">Best performing items</p>
-                </div>
-                <div className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                  {topProducts.length} items
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {topProducts.length > 0 ? (
-                  topProducts.map((product, index) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-150"
-                    >
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-semibold text-sm">
-                          #{index + 1}
+                  <div className="space-y-4">
+                    {topProducts.length > 0 ? (
+                      topProducts.map((product, index) => (
+                        <div
+                          key={product.id}
+                          className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-150"
+                        >
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-semibold text-sm">
+                              #{index + 1}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {product.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Code: {product.barcode}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {product.units_sold || 0} sold
+                            </p>
+                            <p className="text-xs text-green-600 font-medium">
+                              ₹{(product.total_revenue || 0).toLocaleString()}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {product.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Code: {product.barcode}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {product.units_sold || 0} sold
-                        </p>
-                        <p className="text-xs text-green-600 font-medium">
-                          ₹{(product.total_revenue || 0).toLocaleString()}
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <PackageIcon />
+                        </div>
+                        <p className="text-gray-500 text-sm">
+                          No products sold yet
                         </p>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <PackageIcon />
-                    </div>
-                    <p className="text-gray-500 text-sm">
-                      No products sold yet
-                    </p>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Invoice Detail Modal */}
         {showInvoiceModal && selectedInvoice && (
@@ -1392,6 +1666,16 @@ function Dashboard() {
         {/* Products Modal */}
         {showProductsModal && (
           <ProductsModal onClose={() => setShowProductsModal(false)} />
+        )}
+
+        {/* Low Stock Modal */}
+        {showLowStockModal && (
+          <LowStockModal onClose={() => setShowLowStockModal(false)} />
+        )}
+
+        {/* Customize Dashboard Modal */}
+        {isCustomizing && (
+          <CustomizeDashboard onClose={() => setIsCustomizing(false)} />
         )}
       </div>
     </div>
